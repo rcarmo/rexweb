@@ -1,0 +1,16 @@
+{
+  "name": "webterm-frontend",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "bun run typecheck && bun build src/workspace.ts --outfile=dist/static/js/workspace.js --target=browser --minify && cp node_modules/ghostty-web/ghostty-vt.wasm dist/static/js/ && cp -R assets/. dist/static/ && cp -R ../licenses dist/static/ && cp ../THIRD_PARTY_NOTICES.md dist/static/ && cp index.html dist/"
+  },
+  "type": "module",
+  "dependencies": {
+    "ghostty-web": "github:rcarmo/ghostty-web#7ff18ee7b6b42b09da1f5e0553534319d4057cd4"
+  }
+}

@@ -1,0 +1,96 @@
+/* Generic monospace font stack for terminal rendering.
+
+Prefers system monospace fonts, with optional Fira Code / Roboto Mono if available.
+Uses a vendored FiraCode Nerd Font to keep local server self-contained.
+*/
+
+@font-face {
+  font-family: "FiraCode Nerd Font";
+  src: url("/static/fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "FiraMono Nerd Font";
+  src: url("/static/fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --webterm-mono: ui-monospace, "SFMono-Regular", "FiraCode Nerd Font",
+    "FiraMono Nerd Font", "Fira Code", "Roboto Mono", Menlo, Monaco, Consolas,
+    "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
+  --terminal-min-width: 10px;
+  --terminal-min-height: 5px;
+}
+
+html, body {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: var(--webterm-mono);
+}
+
+/* Prevent scrollbar gutter space reservation */
+html {
+  scrollbar-gutter: auto;
+  overflow: hidden;
+}
+
+/* Terminal container - works with ghostty-web canvas renderer */
+.webterm-terminal {
+  /* Ghostty draws the cursor; hide the editable container's browser caret. */
+  caret-color: transparent;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: var(--terminal-min-width);
+  min-height: var(--terminal-min-height);
+  position: relative;
+  overflow: hidden;
+  contain: strict; /* Performance optimization */
+}
+
+/* ghostty-web renders to a canvas element */
+.webterm-terminal canvas {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Hidden textarea for keyboard input */
+.webterm-terminal textarea {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* High DPI display handling */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .webterm-terminal {
+    /* ghostty-web handles DPI scaling via devicePixelRatio */
+  }
+}
+
+/* Fallback for older browsers */
+@supports not (display: flex) {
+  .webterm-terminal {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+}

@@ -1,0 +1,37 @@
+# Build and release output.
+/bin/
+/dist/
+/web/dist/
+/rexweb
+/rexweb.exe
+
+# Go test, coverage and profiling output; local multi-module workspaces.
+*.test
+*.test.exe
+*.out
+*.prof
+*.pprof
+/coverage/
+/go.work
+/go.work.sum
+
+# Frontend dependencies and TypeScript build metadata.
+node_modules/
+*.tsbuildinfo
+
+# Local configuration and runtime files.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.log
+*.sock
+
+# Editor and macOS metadata.
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+._*
