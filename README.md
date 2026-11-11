@@ -8,29 +8,27 @@ Like Rex, you can manage sessions, tabs and nested splits in a Rex-inspired inte
 
 The server currently runs on MacOS, and shell isolation requires `/usr/bin/sandbox-exec`. Its supported protocol subset is described in [SPEC.md](SPEC.md#connect-rex-betaapp), and of course, this project is independent of Superlogical Rex (I'm just a fan, but I prefer web interfaces, which is why I based most of this off of [`webterm`](https://github.com/rcarmo/webterm)).
 
-## Run a release
-
-Download the archive for your Mac: `darwin-arm64` for Apple Silicon or `darwin-amd64` for Intel. Check its SHA-256 digest against `SHA256SUMS`, extract it, and change into the extracted directory:
-
-```sh
-bin/rexweb
-```
-
-Open [http://127.0.0.1:8080](http://127.0.0.1:8080). The binary starts or reconnects to the session daemon and creates a default shell when the daemon has no sessions. The archive includes the frontend; running a release needs neither Bun nor Go. Release binaries are unsigned and are not notarised.
-
-Keep the archive's directory structure intact. The default `-web-dir web/dist` is relative to the working directory. To launch from another directory, supply an absolute `-web-dir` path.
-
 ## Build from source
 
-Install Go 1.24 or later, Bun 1.3.13 or later, and Git. From the repository root:
+For now, build and run locally on macOS. Install Go 1.24 or later, Bun 1.3.13 or later, Git and `make` (available with Xcode Command Line Tools), then clone the repository:
 
 ```sh
+git clone https://github.com/rcarmo/rexweb.git
+cd rexweb
 make install-dev
 make build
 bin/rexweb
 ```
 
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080). The server starts or reconnects to the session daemon and creates a default shell when the daemon has no sessions.
+
 Bun downloads my pinned [`ghostty-web`](https://github.com/rcarmo/ghostty-web) fork, including its compiled JavaScript and WASM, and just vendors it in.
+
+## Binary releases
+
+CI is disabled until we can ship to Linux. Once CI and release publishing are working, you'll be able to download a binary archive for your platform from [GitHub Releases](https://github.com/rcarmo/rexweb/releases), verify its SHA-256 digest against `SHA256SUMS`, extract it and run `bin/rexweb` from the extracted directory. The archive will include the frontend, so running it will need neither Go nor Bun.
+
+Keep the archive's directory structure intact. The default `-web-dir web/dist` is relative to the working directory. To launch from another directory, supply an absolute `-web-dir` path. The current macOS packaging produces unsigned binaries that are not notarised.
 
 ## Sessions and isolation
 
@@ -84,7 +82,7 @@ make release     # Both macOS archives, checksums and an extracted-package smoke
 make clean       # Remove build and release output
 ```
 
-`make release` writes to `dist/` using [VERSION](VERSION). See [RELEASING.md](RELEASING.md) for the GitHub draft-release workflow and [CONTRIBUTING.md](CONTRIBUTING.md) for change guidelines.
+`make release` builds local archives in `dist/` using [VERSION](VERSION). See [RELEASING.md](RELEASING.md) for the planned GitHub draft-release workflow and [CONTRIBUTING.md](CONTRIBUTING.md) for change guidelines.
 
 ## Licence
 
