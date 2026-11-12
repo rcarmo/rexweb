@@ -2,6 +2,8 @@
 
 ## Unreleased — Linux service
 
+- Added synchronized output and canvas recovery; fixed application wheel routing, URL parentheses and event-listener disposal.
+
 - Updated ghostty-web and its official Ghostty 1.4.1-dev core; rebuilt with Zig 0.17.0.
 
 - One foreground service with embedded frontend, web/rex/both modes and a private local Rex socket.

@@ -1,3 +1,4 @@
+import { checkRenderer } from "./renderer-browser-checks";
 import { chromium } from "../web/node_modules/playwright";
 import { mkdtemp, rm } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -6,7 +7,10 @@ const scratch=await mkdtemp("/tmp/rexweb-browser.");
 const server=Bun.spawn([resolve("bin/rexweb"),"-mode","web","-listen","127.0.0.1:0","-session-socket",join(scratch,"run/session.sock"),"-workspace",join(scratch,"work")],{stdout:"pipe",stderr:"pipe"});
 let logs="";void(async()=>{for await(const data of server.stderr)logs+=new TextDecoder().decode(data)})();
 const shared=Boolean(process.env.BROWSER_CDP_URL);
-const browser=shared?await chromium.connectOverCDP(process.env.BROWSER_CDP_URL!):await chromium.launch();
+const browser=await (async()=>{
+ try {return shared?await chromium.connectOverCDP(process.env.BROWSER_CDP_URL!):await chromium.launch()}
+ catch(error){server.kill();await server.exited;await rm(scratch,{recursive:true,force:true});throw error}
+})();
 const context=shared?browser.contexts()[0]:await browser.newContext({hasTouch:true,isMobile:true,viewport:{width:800,height:900}});
 const page=await context.newPage();
 function assert(value:unknown,message:string):asserts value{if(!value)throw new Error(message)}
@@ -123,6 +127,8 @@ try {
  });
  await page.waitForTimeout(100);
  assert(frames.slice(from).map(f=>f.data).join("")==="desktop-λ\ntext ","desktop paste failed");
+ await checkRenderer(page);
+ assert(!errors.length,"browser exceptions: "+errors.join("; "));
  console.log("Browser smoke passed: mobile/desktop paste, bracketed paste, Unicode chunking, IME, focused-pane routing; one shared keyboard; no page exceptions.");
 } finally {
  await page.close();

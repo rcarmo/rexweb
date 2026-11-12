@@ -13,4 +13,4 @@ Run `make install-dev`, then `make build` before Go tests: `web/embed.go` needs 
 
 `make release` cross-compiles static Linux ARM64/AMD64 binaries and tests the native extracted executable from an empty directory. Keep generated output and dependencies out of Git. Frontend modifications must retain the pinned security fixes, vendor provenance and licences in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-For browser regressions, install Chromium with `cd web && bunx playwright install chromium`, then run `make browser-smoke`. This checks the shared mobile keyboard with multiple panes. Set `BROWSER_CDP_URL` to use an existing development browser instead.
+For browser regressions, install Chromium with `cd web && bunx playwright install chromium`, then run `make browser-smoke`. This checks shared mobile input across panes, paste/IME, synchronized rendering, canvas recovery, application wheel reports and link activation. Set `BROWSER_CDP_URL` to use an existing development browser instead.
