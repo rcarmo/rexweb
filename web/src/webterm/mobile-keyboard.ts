@@ -150,6 +150,7 @@ type Target = {
   anchor: () => Anchor;
   selection: () => string;
   copy: () => boolean;
+  upload: (files:File[])=>void;
 };
 export type KeyboardBinding = {
   focus(): void;
@@ -166,9 +167,10 @@ export function bindMobileKeyboard(
   anchor: () => Anchor,
   selection: () => string,
   copy: () => boolean,
+  upload: (files:File[])=>void,
 ): KeyboardBinding {
   shared ??= new MobileKeyboard();
-  return shared.bind({ element, send, paste, anchor, selection, copy });
+  return shared.bind({ element, send, paste, anchor, selection, copy, upload });
 }
 
 class MobileKeyboard {
@@ -396,6 +398,8 @@ class MobileKeyboard {
     };
     textarea.addEventListener("paste", (e) => {
       if (!e.clipboardData) return;
+      const files=Array.from(e.clipboardData.files);
+      if(files.length){e.preventDefault();e.stopPropagation();this.active?.upload(files);textarea.value='';return;}
       e.preventDefault();
       e.stopPropagation();
       paste(e.clipboardData.getData("text/plain"), "paste");

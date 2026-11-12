@@ -31,7 +31,7 @@ var commit = "unknown"
 
 type options struct {
 	mode, listen, rexListen, socket, shell, workdir, webdir, publicURL, passwordFile, cert, key, isolation string
-	anonymous, insecure                                                                                    bool
+	anonymous, insecure, uploads                                                                           bool
 }
 
 func main() {
@@ -66,6 +66,7 @@ func main() {
 	flag.StringVar(&o.passwordFile, "password-file", "", "private file containing web HTTP Basic password (username: rexweb)")
 	flag.StringVar(&o.cert, "tls-cert", "", "PEM TLS certificate for TCP listeners")
 	flag.StringVar(&o.key, "tls-key", "", "PEM TLS key for TCP listeners")
+	flag.BoolVar(&o.uploads, "uploads", false, "enable bounded file uploads (requires web password authentication)")
 	flag.BoolVar(&o.anonymous, "allow-anonymous", false, "allow unauthenticated non-loopback native Rex access: FULL ACCOUNT ACCESS")
 	flag.BoolVar(&o.insecure, "allow-insecure-http", false, "allow remote web password over HTTP (only behind a trusted TLS tunnel)")
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -96,6 +97,9 @@ func (o options) validate() error {
 	}
 	if !filepath.IsAbs(o.shell) || !filepath.IsAbs(o.socket) {
 		return errors.New("absolute -shell and -session-socket paths required")
+	}
+	if o.uploads && (o.passwordFile == "" || o.mode == "rex") {
+		return errors.New("-uploads requires a web listener and -password-file")
 	}
 	if (o.cert == "") != (o.key == "") {
 		return errors.New("-tls-cert and -tls-key must be supplied together")
@@ -162,6 +166,8 @@ func webHandler(o options, store *workspace.Store, assets fs.FS, password string
 	api := store.Handler()
 	mux.Handle("GET /api/sessions", api)
 	mux.Handle("GET /api/session", api)
+	mux.Handle("GET /api/capabilities", api)
+	mux.Handle("POST /api/upload", requireOrigin(api))
 	mux.Handle("GET /api/capture", api)
 	mux.Handle("GET /api/metadata", api)
 	mux.Handle("POST /api/action", requireOrigin(api))
@@ -248,6 +254,11 @@ func runService(ctx context.Context, o options) error {
 	}
 	if err := store.EnableVT(ctx, wasm); err != nil {
 		return err
+	}
+	if o.uploads {
+		if err := store.EnableUploads(); err != nil {
+			return err
+		}
 	}
 	if err := store.EnsureDefault(); err != nil {
 		return fmt.Errorf("default shell: %w", err)

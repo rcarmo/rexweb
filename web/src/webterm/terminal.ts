@@ -442,6 +442,7 @@ const THEMES: Record<string, ITheme> = {
 
 /** Configuration options passed via data attributes or window config */
 interface TerminalConfig {
+  uploadFile?: (file:File)=>Promise<string>;
   autofocus?: boolean;
   fontFamily?: string;
   fontSize?: number;
@@ -548,6 +549,7 @@ class WebTerminal {
   private streamEpoch = 0;
   private connectPending = false;
   private searchAddon = new SearchAddon();
+  private uploadHandler?: (file:File)=>Promise<string>;
   private searchListener?: (result: SearchResults) => void;
   private mobilePositionFrame?: number;
   private ready = false;
@@ -680,6 +682,7 @@ class WebTerminal {
       baseTitle,
       config.autofocus ?? true,
     );
+    instance.uploadHandler=config.uploadFile;
     instance.initialize();
     return instance;
   }
@@ -758,8 +761,19 @@ class WebTerminal {
         () => this.cursorAnchor(),
         () => this.terminal.getSelection(),
         () => this.terminal.copySelection(),
+        files=>this.uploadFiles(files),
       );
     this.setupTouchSelection();
+    this.addTrackedListener(this.element,'paste',((event:ClipboardEvent)=>{
+      const files=Array.from(event.clipboardData?.files??[]);
+      if(files.length){event.preventDefault();event.stopImmediatePropagation();this.uploadFiles(files);}
+    }) as EventListener,{capture:true});
+    this.addTrackedListener(this.element,'dragover',((event:DragEvent)=>{
+      if(event.dataTransfer?.types.includes('Files'))event.preventDefault();
+    }) as EventListener);
+    this.addTrackedListener(this.element,'drop',((event:DragEvent)=>{
+      const files=Array.from(event.dataTransfer?.files??[]);if(files.length){event.preventDefault();event.stopPropagation();this.uploadFiles(files);}
+    }) as EventListener);
     this.addTrackedListener(this.element, "contextmenu", () => {
       if (this.mobileKeyboard) this.mobileKeyboard.prepareCopy();
       else this.prepareNativeCopy();
@@ -1178,6 +1192,17 @@ class WebTerminal {
       : older
         ? this.searchAddon.findNext(text)
         : this.searchAddon.findPrevious(text);
+  }
+
+  async uploadFile(file:File):Promise<void> {
+    if(!this.uploadHandler)throw new Error('Uploads are not configured.');
+    if(file.size>16*1024*1024)throw new Error('File exceeds 16 MiB.');
+    const path=await this.uploadHandler(file);
+    if(!this.disposed && this.ready)this.terminal.paste("'"+path.replaceAll("'","'\\''")+"' ");
+  }
+  private uploadFiles(files:File[]):void {
+    if(files.length>8){this.element.dispatchEvent(new CustomEvent('upload-error',{detail:'Paste at most eight files.',bubbles:true}));return;}
+    void (async()=>{for(const file of files)await this.uploadFile(file)})().catch(error=>this.element.dispatchEvent(new CustomEvent('upload-error',{detail:String(error),bubbles:true})));
   }
 
   navigatePrompt(older=true):boolean {return !this.disposed&&this.terminal.scrollToPrompt(older);}

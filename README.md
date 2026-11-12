@@ -32,6 +32,25 @@ terminal selection. Text paste retains sanitisation and bracketed-paste handling
 Large output is parsed cooperatively so the page can remain interactive;
 reconnect offsets and input readiness wait for parser consumption.
 
+## Images and files
+
+Enable uploads explicitly with a web password:
+
+```sh
+rexweb -mode both -uploads -password-file /private/config/web-password
+```
+
+Use **Upload files…** in the command palette, paste a clipboard image, or drop
+files onto a pane. Each file is stored under a generated name inside the service
+workspace. The quoted path is inserted into the initiating pane without Enter;
+commands are never run automatically. A file is limited to 16 MiB, a paste/drop
+to eight files, and the server to four simultaneous uploads. HTTP uploads require
+both authentication and a matching Origin, including on loopback. Interrupted
+uploads are removed and completed files are committed without overwriting an
+existing file. The selected workspace directory is pinned by a directory handle,
+so replacement symlinks cannot redirect writes. Uploaded files persist until you
+remove them from the workspace. Uploads have no automatic retry.
+
 ## Program status and prompts
 
 Panes show reported working, blocked, done or error states, optional progress,

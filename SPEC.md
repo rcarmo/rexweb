@@ -27,7 +27,7 @@ Supported control methods:
 
 Terminal methods: write, resize, size, input_mode (Linux TCGETS), title (empty), pwd (initial workspace), process (initial shell metadata), program_status (empty), set_theme (no-op). Paste, focus events and basic key encoding are supported. These metadata methods do not inspect arbitrary foreground processes or reconstruct a terminal screen.
 
-Creation accepts one initial shell tab; custom command layouts and initial input are rejected. Floating panes, Lua, target completion, full discovery/help, downloads/uploads, native stream resume and multi-user login are outside this subset. Unknown methods fail explicitly. Revision 13 is not advertised.
+Creation accepts one initial shell tab; custom command layouts and initial input are rejected. Floating panes, Lua, target completion, full discovery/help, downloads and native file-transfer automation, native stream resume and multi-user login are outside this subset. Unknown methods fail explicitly. Revision 13 is not advertised.
 
 ## Security and verification
 
@@ -52,3 +52,7 @@ The server is authoritative for terminal query replies. The embedded browser set
 The server records bounded OSC 7501 statuses and reported title/pwd using Ghostty callbacks. HTTP session views carry a separate terminal_metadata extension for browser badges, leaving native Rex session-view shapes unchanged. Native program_status/title/pwd read the same metadata. Records and prompt events are cleared on VT reset; process exit and VT failure are reflected in browser state.
 
 Default supported shells receive OSC 133 PS1 hooks. Browser Previous/Next prompt navigation uses the client's core marks, temporarily reading core scroll positions and restoring the live viewport before updating external scroll state. No shell input is emitted.
+
+## Web image/file uploads
+
+`-uploads` plus password authentication enables one-file multipart POST uploads. The initiating session/pane must exist. The generated workspace name, detected MIME, size and absolute path are returned as JSON. Storage is rooted in a pinned directory descriptor, with no-follow/exclusive creation, complete-request validation and no-replace atomic commit. Partial files are removed. Browser clipboard/drop/file-picker integrations upload at most eight files sequentially and paste quoted paths without Enter into the initiating live pane. Limits are 16 MiB/file, four server requests and two minutes/request. No automatic retry or uploaded-file serving is provided.

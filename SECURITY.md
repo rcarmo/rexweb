@@ -23,3 +23,7 @@ The service refuses root. Use a dedicated account for shared access. The systemd
 Do not expose an anonymous Rex endpoint to the public internet. Reverse proxies must preserve Host, Origin and Authorization, support WebSocket upgrades and prevent unauthorised bypass. The service never trusts X-Forwarded-* identity headers.
 
 Terminal output is untrusted. Keep the pinned Ghostty security fixes. Do not log terminal input/output, passwords, authentication headers or reconnect/data tickets. Native tickets are one-use, expire after 60 seconds and are bound to a live control connection.
+
+## Upload boundary
+
+Uploads are disabled by default. `-uploads` requires a web listener and private password-file authentication. The allowlisted POST route also requires matching Origin. Limits are 16 MiB per file, four simultaneous requests and two minutes per request. Names are generated server-side; client filenames are display metadata only. The server duplicates a pinned private workspace directory descriptor, creates a no-follow/exclusive temporary file and renames it with no-replace semantics only after a complete one-file multipart request. Partial writes are unlinked through the same descriptor. Files are not served from the frontend asset tree. Browser file/image input is user-initiated; the returned path is shell-quoted and pasted without Enter. No arbitrary local paths are read and no commands are automatically executed.

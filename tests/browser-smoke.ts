@@ -1,3 +1,4 @@
+import { checkUploads } from "./upload-browser-checks";
 import { checkReplay } from "./replay-browser-checks";
 import { checkRenderer } from "./renderer-browser-checks";
 import { chromium } from "../web/node_modules/playwright";
@@ -221,6 +222,7 @@ try {
  assert(frames.length===beforeNavigation,'prompt navigation sent shell input');
  await checkReplay(page,`http://${address}`);
  await checkRenderer(page);
+ await checkUploads(page);
  assert(!errors.length,"browser exceptions: "+errors.join("; "));
  console.log("Browser smoke passed: mobile/desktop paste, bracketed paste, Unicode chunking, IME, focused-pane routing; one shared keyboard; no page exceptions.");
 } finally {

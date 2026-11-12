@@ -128,6 +128,24 @@ async function exportFocused(format: 'text'|'html'|'vt') {
   }catch(error){status.textContent=String(error);}
 }
 
+let uploadsEnabled=false;
+const uploadInput=document.querySelector<HTMLInputElement>('#upload-file')!;
+void fetch('/api/capabilities').then(response=>response.json()).then(value=>{uploadsEnabled=!!value.uploads;});
+async function uploadToPane(file:File,session:string,block:string):Promise<string> {
+  if(!uploadsEnabled)throw new Error('Uploads are disabled; configure -uploads with web password authentication.');
+  const body=new FormData();body.append('file',file,file.name);
+  const response=await fetch('/api/upload?'+new URLSearchParams({session,block}),{method:'POST',body});
+  const result=await response.json();if(!response.ok)throw new Error(result.message??'Upload failed');
+  status.textContent=`Uploaded ${result.display_name||result.name}`;return result.path;
+}
+uploadInput.addEventListener('change',()=>{
+  const terminal=panes.get(activeWindow?.focused_block_id??'')?.terminal;
+  const files=Array.from(uploadInput.files??[]);uploadInput.value='';
+  if(files.length>8){status.textContent='Select at most eight files.';return;}
+  if(terminal)void (async()=>{for(const file of files)await terminal.uploadFile(file)})().catch(error=>{status.textContent=String(error);});
+});
+workspace.addEventListener('upload-error',event=>{status.textContent=(event as CustomEvent).detail;});
+
 function icon(name: string) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.classList.add("icon");
@@ -286,7 +304,8 @@ function mountPane(block: Block, rect: Rect, keep: Set<string>) {
     url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
     url.search = new URLSearchParams({ session: sessionId, block: id }).toString();
     const mounted = pane;
-    void WebTerminal.create(terminal, url.href, { autofocus: false, fontSize: 14, theme: terminalTheme() }).then((instance) => {
+    const ownerSession=sessionId;
+    void WebTerminal.create(terminal, url.href, { autofocus: false, fontSize: 14, theme: terminalTheme(), uploadFile:file=>uploadToPane(file,ownerSession,id) }).then((instance) => {
       if (panes.get(id) === mounted) {
         mounted.terminal = instance;
         if (activeWindow?.focused_block_id === id) { focusTerminal(); runSearch(); }
@@ -475,6 +494,7 @@ function render() {
 
 function runCommand(op: string, block = activeWindow?.focused_block_id, initialName = "") {
   chooser.close();
+  if(op==='upload-file'){uploadInput.click();return;}
   if(op==='previous-prompt'||op==='next-prompt'){
     if(!panes.get(block??'')?.terminal?.navigatePrompt(op==='previous-prompt'))status.textContent='No retained prompt in that direction.';
     focusTerminal();return;
@@ -527,6 +547,7 @@ function renderChooser() {
       { label: "New session", glyph: "plus", run: () => runCommand("create") },
       ...(view ? [
         { label: "New tab", glyph: "plus", run: () => runCommand("new-window") },
+        ...(uploadsEnabled?[{label:'Upload files…',glyph:'plus',run:()=>runCommand('upload-file')}]:[]),
         { label: "Previous prompt", glyph: "terminal", run: () => runCommand("previous-prompt") },
         { label: "Next prompt", glyph: "terminal", run: () => runCommand("next-prompt") },
         { label: "Export terminal as text", glyph: "terminal", run: () => runCommand("export-text") },

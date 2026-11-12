@@ -2,6 +2,8 @@
 
 ## Unreleased — Linux service
 
+- Added opt-in authenticated image/file uploads with confined atomic storage, limits, clipboard/drop and file-picker path paste.
+
 - Added server-derived status/title/cwd badges, default-shell prompt marks and focused prompt navigation.
 - Made server VT query replies authoritative to avoid duplicate browser replies.
 

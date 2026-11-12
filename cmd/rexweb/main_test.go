@@ -47,6 +47,22 @@ func TestListenerPolicy(t *testing.T) {
 		})
 	}
 }
+func TestUploadRequiresWebAuthentication(t *testing.T) {
+	o := validOptions()
+	o.uploads = true
+	if err := o.validate(); err == nil {
+		t.Fatal("anonymous upload configuration accepted")
+	}
+	o.passwordFile = "/private/password"
+	if err := o.validate(); err != nil {
+		t.Fatal(err)
+	}
+	o.mode = "rex"
+	if err := o.validate(); err == nil {
+		t.Fatal("native-only uploads accepted")
+	}
+}
+
 func TestWebBoundary(t *testing.T) {
 	store := workspace.New("/bin/sh", workspace.Sandbox{})
 	defer store.Close()

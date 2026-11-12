@@ -46,6 +46,8 @@ func respond(w http.ResponseWriter, result any, err error) {
 func (s *Store) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/sessions", s.list)
+	mux.HandleFunc("GET /api/capabilities", s.capabilities)
+	mux.HandleFunc("POST /api/upload", s.upload)
 	mux.HandleFunc("GET /api/session", s.view)
 	mux.HandleFunc("GET /api/capture", s.capture)
 	mux.HandleFunc("GET /api/metadata", s.metadata)

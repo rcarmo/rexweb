@@ -28,6 +28,7 @@ type Store struct {
 	hostID   string
 	watchers map[chan workspaceEvent]struct{}
 	vtEngine *vt.Engine
+	uploads  *uploadRoot
 }
 
 type session struct {
@@ -93,6 +94,10 @@ func (s *Store) Close() {
 		}
 	}
 	s.sessions = nil
+	if s.uploads != nil {
+		s.uploads.close()
+		s.uploads = nil
+	}
 	if s.vtEngine != nil {
 		s.vtEngine.Close()
 		s.vtEngine = nil
