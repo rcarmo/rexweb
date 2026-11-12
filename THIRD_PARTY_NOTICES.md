@@ -13,6 +13,8 @@ The project's MIT licence applies to its own code. The following components reta
 | Wuffs image decoding support | [0.4.0-alpha.10, commit 7411f488fe2e2c205c3d3b3d28638b7356522930](https://github.com/google/wuffs/tree/7411f488fe2e2c205c3d3b3d28638b7356522930), linked by the Ghostty VT build | MIT (selected from Apache-2.0 OR MIT); [notice](licenses/wuffs-MIT.txt) |
 | Zig runtime | 0.17.0, used to build the bundled VT WASM | [MIT](licenses/zig-MIT.txt) |
 | Go standard library and runtime | Compiler version is recorded by `go version -m` on each release binary | [BSD-3-Clause](licenses/go-BSD-3-Clause.txt) |
+| wazero WASM runtime | [v1.11.0](https://github.com/tetratelabs/wazero/tree/v1.11.0), pure-Go server-side VT execution | [Apache-2.0](licenses/wazero-Apache-2.0.txt), [NOTICE](licenses/wazero-NOTICE.txt) |
+| Go supplementary modules | golang.org/x/net v0.46.0 (HTML export policy), golang.org/x/sys v0.38.0 (runtime platform support) | [BSD-3-Clause](licenses/golang-supplementary-BSD.txt) |
 | creack/pty | [v1.1.24](https://github.com/creack/pty/tree/v1.1.24) | [MIT](licenses/creack-pty-MIT.txt), copyright 2011 Keith Rarick |
 | Gorilla WebSocket | [v1.5.3](https://github.com/gorilla/websocket/tree/v1.5.3) | [BSD-2-Clause](licenses/gorilla-websocket-BSD-2-Clause.txt), copyright 2013 The Gorilla WebSocket Authors |
 | FiraCode Nerd Font | Fira Code 6.002, patched with Nerd Fonts 3.4.0, as recorded in the font's name table | [SIL OFL 1.1](licenses/FiraCode-OFL-1.1.txt), [Nerd Fonts notices](licenses/nerd-fonts-LICENSE.txt), and retained glyph notices below |

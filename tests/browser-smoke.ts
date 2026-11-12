@@ -197,6 +197,12 @@ try {
  const desktopInput=desktop.locator('textarea').first();assert(await desktopInput.inputValue()==='COPY-DESKTOP','desktop native copy did not stage selection');
  const desktopCopied=await desktopInput.evaluate(input=>{const data=new DataTransfer();input.dispatchEvent(new ClipboardEvent('copy',{clipboardData:data,bubbles:true,cancelable:true}));return data.getData('text/plain');});
  assert(desktopCopied==='COPY-DESKTOP'&&await desktopInput.inputValue()==='','desktop native copy payload failed');
+ const exportResponse=page.waitForResponse(response=>response.url().includes('/api/capture?')&&response.request().method()==='GET');
+ await page.getByRole('button',{name:'Command palette',exact:true}).click();
+ await page.locator('#chooser-filter').fill('Export terminal as text');
+ await page.getByRole('button',{name:'Export terminal as text',exact:true}).click();
+ const exported=await exportResponse;
+ assert(exported.ok()&&(await exported.text()).includes('COPY-DESKTOP'),'command-palette export did not read the focused server terminal');
  await checkReplay(page,`http://${address}`);
  await checkRenderer(page);
  assert(!errors.length,"browser exceptions: "+errors.join("; "));

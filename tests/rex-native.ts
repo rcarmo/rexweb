@@ -83,6 +83,14 @@ export async function smokeNative(address: string, session: string, block: strin
       output += decoder.decode(await data.next() as ArrayBuffer, { stream: true });
     }
 
+    const capture=await rpc('com.superlogical.terminal.format',{...target,args:{format:'text',trim:true,max_bytes:64}});
+    let captured=capture.content;
+    if(capture.id!==undefined){
+      let eof=capture.eof;
+      while(!eof){const part=await rpc('com.superlogical.terminal.blob_read',{...target,args:{id:capture.id,offset:new TextEncoder().encode(captured).length,max_bytes:64}});captured+=part.content;eof=part.eof;}
+    }
+    check(captured.includes('native-OK-31 93'),'native capture missed authoritative output');
+
     const split = await rpc("session.new_split", {
       ...target, anchor_id: block, direction: "vertical", side: "after", focus: true,
       layout: { block: { flavor: "com.superlogical.terminal.shell" } },

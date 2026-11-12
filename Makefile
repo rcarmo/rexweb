@@ -1,4 +1,4 @@
-.PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke release clean
+.PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke vt-callbacks release clean
 .DEFAULT_GOAL := build
 
 VERSION ?= $(shell cat VERSION)
@@ -6,6 +6,9 @@ VERSION ?= $(shell cat VERSION)
 install-dev:
 	go mod download
 	cd web && bun install --frozen-lockfile
+
+vt-callbacks:
+	bun scripts/build-vt-callbacks.ts
 
 typecheck:
 	cd web && bun run typecheck

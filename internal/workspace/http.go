@@ -3,9 +3,11 @@ package workspace
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"rexweb/internal/vt"
 	"strconv"
 	"time"
 
@@ -45,6 +47,8 @@ func (s *Store) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/sessions", s.list)
 	mux.HandleFunc("GET /api/session", s.view)
+	mux.HandleFunc("GET /api/capture", s.capture)
+	mux.HandleFunc("GET /api/metadata", s.metadata)
 	mux.HandleFunc("POST /api/action", s.action)
 	mux.HandleFunc("GET /api/terminal", s.terminal)
 	return mux
@@ -225,4 +229,50 @@ func writeBinary(ws *websocket.Conn, data []byte) error {
 func sendExit(ws *websocket.Conn) {
 	writeJSON(ws, "exit", nil)
 	ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
+}
+
+func (s *Store) metadata(w http.ResponseWriter, r *http.Request) {
+	p := s.lookupPane(r.URL.Query().Get("session"), r.URL.Query().Get("block"))
+	if p == nil {
+		respond(w, nil, missing("pane"))
+		return
+	}
+	respond(w, p.metadata(), nil)
+}
+func (s *Store) capture(w http.ResponseWriter, r *http.Request) {
+	p := s.lookupPane(r.URL.Query().Get("session"), r.URL.Query().Get("block"))
+	if p == nil {
+		respond(w, nil, missing("pane"))
+		return
+	}
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "text"
+	}
+	if format != "text" && format != "vt" && format != "html" {
+		respond(w, nil, invalid("capture format"))
+		return
+	}
+	data, err := p.capture(format, r.URL.Query().Get("trim") != "false", r.URL.Query().Get("unwrap") == "true")
+	if errors.Is(err, vt.ErrCaptureLimit) {
+		respond(w, nil, &apiError{413, "capture exceeds 4 MiB"})
+		return
+	}
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	mime, extension := "text/plain; charset=utf-8", "txt"
+	if format == "vt" {
+		extension = "vt"
+	}
+	if format == "html" {
+		mime = "text/html; charset=utf-8"
+		extension = "html"
+		w.Header().Set("Content-Security-Policy", vt.ExportCSP)
+	}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="terminal.%s"`, extension))
+	w.Write(data)
 }

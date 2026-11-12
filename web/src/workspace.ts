@@ -113,6 +113,19 @@ searchText.addEventListener("keydown", (event) => {
   }
 });
 
+async function exportFocused(format: 'text'|'html'|'vt') {
+  const block=activeWindow?.focused_block_id;
+  if(!block)return;
+  try {
+    const query=new URLSearchParams({session:sessionId,block,format,trim:'true'});
+    const response=await fetch('/api/capture?'+query);
+    if(!response.ok){const error=await response.json();throw new Error(error.message??'Capture failed');}
+    const url=URL.createObjectURL(await response.blob());
+    const link=document.createElement('a');link.href=url;link.download=`terminal.${format==='text'?'txt':format}`;link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }catch(error){status.textContent=String(error);}
+}
+
 function icon(name: string) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.classList.add("icon");
@@ -448,6 +461,7 @@ function render() {
 
 function runCommand(op: string, block = activeWindow?.focused_block_id, initialName = "") {
   chooser.close();
+  if(op==='export-text'||op==='export-html'||op==='export-vt'){void exportFocused(op.slice(7) as 'text'|'html'|'vt');return;}
   if (op === "create" || op === "rename" || op === "destroy" || op === "close-block") {
     const naming = op === "create" || op === "rename";
     const label = op === "create" ? "New session" : op === "rename" ? "Rename session" :
@@ -495,6 +509,9 @@ function renderChooser() {
       { label: "New session", glyph: "plus", run: () => runCommand("create") },
       ...(view ? [
         { label: "New tab", glyph: "plus", run: () => runCommand("new-window") },
+        { label: "Export terminal as text", glyph: "terminal", run: () => runCommand("export-text") },
+        { label: "Export terminal as HTML", glyph: "terminal", run: () => runCommand("export-html") },
+        { label: "Export terminal as VT", glyph: "terminal", run: () => runCommand("export-vt") },
         { label: "Rename session", glyph: "session", run: () => runCommand("rename") },
         { label: "End session", glyph: "close", run: () => runCommand("destroy"), danger: true },
       ] : []),

@@ -103,6 +103,10 @@ try {
  await pane(origin,session,block,checks.join(" && ")+" && printf 'sandbox-%s\\n' enforced","sandbox-enforced");
  assert(await Bun.file(s.work+"/.home/allowed").exists(),"home is not writable");
  assert(!await Bun.file(canary+".write").exists(),"sandbox escaped");
+ const capture=await fetch(origin+'/api/capture?'+new URLSearchParams({session,block,format:'text',trim:'true'}));
+ assert(capture.ok&&(await capture.text()).includes('sandbox-enforced'),'server-side VT capture missing');
+ const htmlCapture=await fetch(origin+'/api/capture?'+new URLSearchParams({session,block,format:'html'}));
+ assert(htmlCapture.ok&&htmlCapture.headers.get('content-security-policy')?.includes("default-src 'none'"),'HTML export security policy missing');
  const offset=await pane(origin,session,block,"export CHECK=alive; printf 'first-%s\\n' \"$CHECK\"","first-alive");
  await Bun.sleep(100);
  await pane(origin,session,block,"printf 'resumed-%s\\n' \"$CHECK\"","resumed-alive",offset);
@@ -121,6 +125,8 @@ try {
    run(["split","-s",made.session_id,"--json"]);
    run(["send","-s",made.session_id,"printf cli-ok"]);
    run(["send-key","-s",made.session_id,"enter"]);
+   await Bun.sleep(100);
+   const captured=run(['capture','-s',made.session_id,'--trim']);assert(captured.includes('cli-ok'),'official CLI capture failed');
    run(["kill",made.session_id]);
   }
  }

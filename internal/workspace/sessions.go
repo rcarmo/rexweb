@@ -2,9 +2,12 @@
 package workspace
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
+	"rexweb/internal/vt"
 	"slices"
 	"strings"
 	"sync"
@@ -24,6 +27,7 @@ type Store struct {
 	sessions []*session
 	hostID   string
 	watchers map[chan workspaceEvent]struct{}
+	vtEngine *vt.Engine
 }
 
 type session struct {
@@ -53,6 +57,22 @@ func New(shell string, sandbox Sandbox) *Store {
 	return &Store{shell: shell, sandbox: sandbox, hostID: uuid(), watchers: make(map[chan workspaceEvent]struct{})}
 }
 
+// EnableVT installs the shared compilation cache before any panes are started.
+func (s *Store) EnableVT(ctx context.Context, wasm []byte) error {
+	engine, err := vt.NewEngine(ctx, wasm)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.sessions) != 0 || s.vtEngine != nil {
+		engine.Close()
+		return fmt.Errorf("VT must be enabled before creating sessions")
+	}
+	s.vtEngine = engine
+	return nil
+}
+
 func newID(kind string) string { return kind + ":" + uuid() }
 
 func uuid() string {
@@ -73,6 +93,10 @@ func (s *Store) Close() {
 		}
 	}
 	s.sessions = nil
+	if s.vtEngine != nil {
+		s.vtEngine.Close()
+		s.vtEngine = nil
+	}
 }
 
 func (s *Store) find(id string) *session {
@@ -92,7 +116,7 @@ func (s *Store) newPane() (*pane, error) {
 	if count >= maxPanes {
 		return nil, &apiError{http.StatusConflict, "pane limit reached"}
 	}
-	return startPane(s.sandbox, s.shell)
+	return startPane(s.sandbox, s.shell, s.vtEngine)
 }
 
 func (s *session) addWindow(p *pane, name string) *window {

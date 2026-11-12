@@ -327,16 +327,39 @@ func (s *rexServer) terminalCall(c *rexClient, method string, a rexArgs) (fields
 	}
 
 	var args struct {
-		Data   string `json:"data"`
-		Cols   int    `json:"columns"`
-		Rows   int    `json:"rows"`
-		Width  int    `json:"cell_width_px"`
-		Height int    `json:"cell_height_px"`
+		Data     string `json:"data"`
+		Format   string `json:"format"`
+		Trim     bool   `json:"trim"`
+		Unwrap   bool   `json:"unwrap"`
+		MaxBytes int    `json:"max_bytes"`
+		ID       uint32 `json:"id"`
+		Offset   int    `json:"offset"`
+		Cols     int    `json:"columns"`
+		Rows     int    `json:"rows"`
+		Width    int    `json:"cell_width_px"`
+		Height   int    `json:"cell_height_px"`
 	}
 	if len(a.Args) != 0 && json.Unmarshal(a.Args, &args) != nil {
 		return nil, invalid("terminal method arguments")
 	}
 	switch a.Method {
+	case "format":
+		format := args.Format
+		if format == "" {
+			format = "text"
+		}
+		if format != "text" && format != "vt" && format != "html" {
+			return nil, invalid("format")
+		}
+		if args.MaxBytes < 0 {
+			return nil, invalid("max_bytes")
+		}
+		return p.nativeCapture(format, args.Trim, args.Unwrap, args.MaxBytes)
+	case "blob_read":
+		if args.MaxBytes < 0 {
+			return nil, invalid("max_bytes")
+		}
+		return p.nativeBlob(args.ID, args.Offset, args.MaxBytes)
 	case "write":
 		if len(args.Data) > 64<<10 {
 			return nil, invalid("terminal input length")
@@ -358,15 +381,30 @@ func (s *rexServer) terminalCall(c *rexClient, method string, a rexArgs) (fields
 	case "input_mode":
 		return p.inputMode()
 	case "title":
-		return fields{}, nil
+		return fields{"title": p.metadata().Title}, nil
 	case "pwd":
-		return fields{"pwd": s.store.sandbox.Root()}, nil
+		pwd := p.metadata().PWD
+		if pwd == "" {
+			pwd = s.store.sandbox.Root()
+		}
+		return fields{"pwd": pwd}, nil
 	case "process":
 		child := fields{"pid": p.process.Pid, "name": filepath.Base(s.store.shell), "path": s.store.shell,
 			"cwd": s.store.sandbox.Root()}
 		return fields{"child": child, "foreground": child, "ancestors": []fields{}, "home": filepath.Join(s.store.sandbox.Root(), ".home")}, nil
 	case "program_status":
-		return fields{"records": []fields{}}, nil
+		records := []fields{}
+		for _, record := range p.metadata().Records {
+			kind, progress := any(nil), any(nil)
+			if record.Kind != "none" {
+				kind = record.Kind
+			}
+			if record.Progress >= 0 {
+				progress = record.Progress
+			}
+			records = append(records, fields{"state": record.State, "kind": kind, "progress": progress, "id": record.ID, "app": record.App, "title": record.Title, "message": record.Message})
+		}
+		return fields{"records": records}, nil
 	case "set_theme":
 		return fields{}, nil // The native client draws with its selected theme.
 	default:

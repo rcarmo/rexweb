@@ -2,6 +2,8 @@
 
 ## Unreleased — Linux service
 
+- Added authoritative server-side Ghostty VT state, native Rex capture/pagination, and secure text/HTML/VT exports.
+
 - Added focused-pane search, cursor-anchored shared IME/native Copy, and cooperative replay-safe output parsing.
 - Updated the renderer to cached ABI-manifest-driven layouts and compatibility checks.
 

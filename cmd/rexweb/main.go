@@ -162,6 +162,8 @@ func webHandler(o options, store *workspace.Store, assets fs.FS, password string
 	api := store.Handler()
 	mux.Handle("GET /api/sessions", api)
 	mux.Handle("GET /api/session", api)
+	mux.Handle("GET /api/capture", api)
+	mux.Handle("GET /api/metadata", api)
 	mux.Handle("POST /api/action", requireOrigin(api))
 	mux.Handle("GET /api/terminal", requireOrigin(api))
 	mux.Handle("GET /", http.FileServer(http.FS(assets)))
@@ -240,6 +242,13 @@ func runService(ctx context.Context, o options) error {
 	}
 	store := workspace.New(o.shell, env)
 	defer store.Close()
+	wasm, err := fs.ReadFile(web.Assets(), "static/js/ghostty-vt.wasm")
+	if err != nil {
+		return err
+	}
+	if err := store.EnableVT(ctx, wasm); err != nil {
+		return err
+	}
 	if err := store.EnsureDefault(); err != nil {
 		return fmt.Errorf("default shell: %w", err)
 	}

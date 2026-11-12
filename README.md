@@ -32,6 +32,25 @@ terminal selection. Text paste retains sanitisation and bracketed-paste handling
 Large output is parsed cooperatively so the page can remain interactive;
 reconnect offsets and input readiness wait for parser consumption.
 
+## Capture and export
+
+The service keeps parsed VT state for every pane, even without a browser attached.
+Use the command palette to export the focused terminal as text, HTML or VT.
+The official Rex CLI can capture the same authoritative screen and history:
+
+```sh
+rex -S /run/user/1000/rexweb/session.sock --autostart=false capture -s work --trim
+```
+
+The VT engine shares a compilation cache but isolates each terminal's memory,
+with a 64 MiB per-module limit, 16 MiB/2000-line scrollback limits and bounded
+execution calls. Exports are limited to 4 MiB. Native Rex exports paginate large
+content with `max_bytes` and `blob_read`; retained export blobs are bounded and
+expire after five minutes. HTML exports are offline documents with unsafe links
+removed and scripts blocked. Capture describes the active screen; it does not
+keep shell processes alive across a service restart. When no viewer is attached,
+the service can answer terminal queries itself.
+
 ## Choose listeners
 
 ```sh
@@ -59,7 +78,7 @@ rex -S /run/user/1000/rexweb/session.sock --autostart=false send-key -s work ent
 
 In Rex.app, add `http://127.0.0.1:7297` as a remote host when native TCP is enabled. The adapter supports Rex protocol revision 12: session management, tabs, tiled splits, terminal input and output. Newer clients must support revision 12.
 
-One live viewer per pane is supported. Close a browser pane/tab viewer before attaching that pane from Rex, or use another pane. Native resume, floating panes, Lua, command-layout options, capture/screen reconstruction, the full automation/discovery API and multi-user login are unsupported. Unsupported methods fail explicitly. See [SPEC.md](SPEC.md).
+One live viewer per pane is supported. Close a browser pane/tab viewer before attaching that pane from Rex, or use another pane. Native resume, floating panes, Lua, command-layout options, the full automation/discovery API and multi-user login are unsupported. Unsupported methods fail explicitly. See [SPEC.md](SPEC.md).
 
 ## Remote access
 

@@ -147,10 +147,12 @@ func (s *rexServer) resolveTargets(payload json.RawMessage) (fields, error) {
 
 func terminalAPI() fields {
 	methods := fields{}
-	for _, name := range []string{"write", "resize", "size", "input_mode", "title", "pwd", "process", "program_status", "set_theme"} {
+	for _, name := range []string{"write", "resize", "size", "input_mode", "title", "pwd", "process", "program_status", "set_theme", "format", "blob_read"} {
 		methods[name] = fields{"description": "Terminal " + name}
 	}
 	methods["write"] = fields{"description": "Type text into the PTY.", "input_schema": fields{"type": "object", "properties": fields{"data": fields{"type": "string"}}, "required": []string{"data"}}}
+	methods["format"] = fields{"description": "Capture the authoritative terminal screen and retained history.", "input_schema": fields{"type": "object", "properties": fields{"format": fields{"type": "string"}, "trim": fields{"type": "boolean"}, "unwrap": fields{"type": "boolean"}, "max_bytes": fields{"type": "integer"}}}}
+	methods["blob_read"] = fields{"description": "Read a paginated terminal capture.", "input_schema": fields{"type": "object", "properties": fields{"id": fields{"type": "integer"}, "offset": fields{"type": "integer"}, "max_bytes": fields{"type": "integer"}}}}
 	return fields{"methods": methods, "events": fields{"paste": fields{"type": "object", "properties": fields{"text": fields{"type": "string"}}}, "key": fields{"type": "object"}, "focus": fields{"type": "object"}}}
 }
 func (s *rexServer) describeBlocks(a rexArgs, single bool) (fields, error) {

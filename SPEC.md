@@ -2,7 +2,7 @@
 
 ## Process and persistence
 
-One foreground process owns the session Store, PTYs, private Unix listener and selected TCP listeners. `-mode web` enables browser TCP, `-mode rex` enables native TCP, and `-mode both` enables both. The private local Rex socket is always present. Default addresses are loopback. All selected listeners must bind successfully; a startup error exits nonzero and releases already-opened listeners. A socket lifetime lock prevents concurrent service instances on the same socket. Regular files are never replaced as stale sockets.
+One foreground process owns the session Store, PTYs, private Unix listener and selected TCP listeners. `-mode web` enables browser TCP, `-mode rex` enables native TCP, and `-mode both` enables both. The private local Rex socket is always present. Each pane also owns an isolated Ghostty VT module in a shared pure-Go WASM compilation cache. Default addresses are loopback. All selected listeners must bind successfully; a startup error exits nonzero and releases already-opened listeners. A socket lifetime lock prevents concurrent service instances on the same socket. Regular files are never replaced as stale sockets.
 
 SIGINT/SIGTERM closes HTTP servers, hijacked WebSockets and panes. Shells and layouts survive client disconnects. They do not survive service termination. Workspace files persist, and `-workspace` allows a stable location across service restarts. A fresh service starts one default shell.
 
@@ -27,7 +27,7 @@ Supported control methods:
 
 Terminal methods: write, resize, size, input_mode (Linux TCGETS), title (empty), pwd (initial workspace), process (initial shell metadata), program_status (empty), set_theme (no-op). Paste, focus events and basic key encoding are supported. These metadata methods do not inspect arbitrary foreground processes or reconstruct a terminal screen.
 
-Creation accepts one initial shell tab; custom command layouts and initial input are rejected. Floating panes, Lua, target completion, full discovery/help, capture, downloads/uploads, native stream resume and multi-user login are outside this subset. Unknown methods fail explicitly. Revision 13 is not advertised.
+Creation accepts one initial shell tab; custom command layouts and initial input are rejected. Floating panes, Lua, target completion, full discovery/help, downloads/uploads, native stream resume and multi-user login are outside this subset. Unknown methods fail explicitly. Revision 13 is not advertised.
 
 ## Security and verification
 
@@ -40,3 +40,9 @@ Run `make check`, `make race`, `make smoke` and `make release`. Smoke tests cove
 The focused-pane search uses the core's literal search over the active screen and loaded history, with ASCII case folding, a 1024-character query limit, result counts and a selected-match highlight. It owns a separate decoration layer and frees native handles when panes reset or close. Switching panes clears the former target's highlight. Search never supplies terminal input or searches other sessions.
 
 Mobile input remains a single shared textarea/keybar. Its anchor follows the focused pane's cursor and stays within the visible viewport. Native clipboard staging is user-initiated, uses the current selection, and clears staged text after Copy or subsequent input. No background clipboard reads are performed.
+
+## Authoritative capture
+
+The server embeds the same Ghostty WASM as the browser bundle and executes it through wazero, without CGO or an external runtime. Each pane has an independent module with a 64 MiB memory cap and bounded calls; output is fed before publication. Native `format`/`blob_read` and the browser capture endpoint read this state without requiring a viewer. Browser command-palette exports support text, HTML and VT. Captures cover the active screen and its retained history (2000 lines/16 MiB, page-granular pruning), with a 4 MiB export cap. Native chunks obey encoded JSON limits; at most 4 MiB of temporary blobs is retained per pane. HTML export is sanitised and supplied with an offline CSP.
+
+Headless query replies are used only when no live viewer owns the stream; the connected viewer's existing reply path is preserved. Capture does not imply service-restart session persistence or a stable native snapshot wire format.

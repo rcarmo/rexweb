@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"rexweb/internal/vt"
 )
 
 const historyBytes = 512 << 10
@@ -29,6 +31,10 @@ type pane struct {
 	updates  chan paneUpdate
 	consumer string
 	vt       terminalModes
+	state    *vt.State
+	stateErr error
+	blobs    map[uint32]captureBlob
+	nextBlob uint32
 	exitCode int
 	size     pty.Winsize
 	lagging  bool
@@ -49,7 +55,21 @@ type paneUpdate struct {
 	size   *pty.Winsize
 }
 
-func startPane(sandbox Sandbox, shell string) (*pane, error) {
+func startPane(sandbox Sandbox, shell string, engine *vt.Engine) (*pane, error) {
+	var state *vt.State
+	var err error
+	if engine != nil {
+		state, err = engine.NewTerminal(context.Background(), 80, 24)
+		if err != nil {
+			return nil, err
+		}
+	}
+	success := false
+	defer func() {
+		if !success && state != nil {
+			state.Close()
+		}
+	}()
 	master, slave, err := pty.Open()
 	if err != nil {
 		return nil, err
@@ -101,7 +121,7 @@ func startPane(sandbox Sandbox, shell string) (*pane, error) {
 		return nil, err
 	}
 
-	p := &pane{id: newID("block"), file: file, process: cmd.Process, history: make([]byte, historyBytes), size: pty.Winsize{Cols: 80, Rows: 24}}
+	p := &pane{id: newID("block"), file: file, process: cmd.Process, history: make([]byte, historyBytes), state: state, size: pty.Winsize{Cols: 80, Rows: 24}}
 	wait := make(chan int, 1)
 	go func() {
 		cmd.Wait()
@@ -134,6 +154,7 @@ func startPane(sandbox Sandbox, shell string) (*pane, error) {
 		}
 		p.mu.Unlock()
 	}()
+	success = true
 	return p, nil
 }
 
@@ -172,7 +193,10 @@ func pollableMaster(master *os.File) (*os.File, error) {
 
 func (p *pane) publish(data []byte) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	var replies []byte
+	if p.state != nil && p.stateErr == nil {
+		replies, p.stateErr = p.state.Feed(data)
+	}
 	index := int(p.end % historyBytes)
 	n := copy(p.history[index:], data)
 	copy(p.history, data[n:])
@@ -180,6 +204,18 @@ func (p *pane) publish(data []byte) {
 	p.vt.update(data)
 	if p.updates != nil && !p.lagging {
 		p.sendUpdate(paneUpdate{output: append([]byte(nil), data...)})
+	}
+	// Preserve the connected client's reply ownership. Headless terminals
+	// still answer queries when no live viewer can do so.
+	replyHeadless := p.updates == nil || p.lagging
+	failed := p.stateErr != nil
+	p.mu.Unlock()
+	if failed && p.process != nil {
+		p.process.Kill()
+		return
+	}
+	if replyHeadless && len(replies) > 0 {
+		p.write(string(replies))
 	}
 }
 
@@ -266,6 +302,11 @@ func (p *pane) resizeCells(cols, rows, width, height int) error {
 	if err := pty.Setsize(p.file, &size); err != nil {
 		return err
 	}
+	if p.state != nil {
+		if err := p.state.Resize(uint32(cols), uint32(rows), uint32(width), uint32(height)); err != nil {
+			return err
+		}
+	}
 	p.size = size
 	p.sendUpdate(paneUpdate{size: &size})
 	return nil
@@ -286,6 +327,10 @@ func (p *pane) canControl(id string) bool {
 func (p *pane) close() {
 	p.mu.Lock()
 	p.file.Close()
+	if p.state != nil {
+		p.state.Close()
+	}
+	p.blobs = nil
 	p.mu.Unlock()
 	p.process.Kill()
 }
@@ -294,4 +339,24 @@ func (p *pane) exitStatus() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.exitCode
+}
+
+func (p *pane) capture(format string, trim, unwrap bool) ([]byte, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.state == nil {
+		return nil, &apiError{503, "terminal capture unavailable"}
+	}
+	if p.stateErr != nil {
+		return nil, &apiError{503, "terminal state unavailable"}
+	}
+	return p.state.Capture(format, trim, unwrap)
+}
+func (p *pane) metadata() vt.Info {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.state == nil {
+		return vt.Info{Records: []vt.Status{}, Prompts: []vt.Prompt{}}
+	}
+	return p.state.Info()
 }
