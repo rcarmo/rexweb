@@ -8,12 +8,19 @@
         "ghostty-web": "github:rcarmo/ghostty-web#7ff18ee7b6b42b09da1f5e0553534319d4057cd4",
       },
       "devDependencies": {
+        "playwright": "1.61.0",
         "typescript": "^5.7.0",
       },
     },
   },
   "packages": {
+    "fsevents": ["fsevents@2.3.2", "", { "os": "darwin", "hasInstallScript": true }, "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="],
+
     "ghostty-web": ["ghostty-web@github:rcarmo/ghostty-web#7ff18ee", {}, "rcarmo-ghostty-web-7ff18ee", "sha512-5pmx0UepnsrcMy1kvYCtl75R2hZzz4n+fe8sTsd2ANIw2Vbm4fbecP/uM1CQH8OeYH6I0notcVrwp0bWETlP5g=="],
+
+    "playwright": ["playwright@1.61.0", "", { "dependencies": { "playwright-core": "1.61.0" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha512-Z+7BeeqQPRRzklHsVFP4KTGIyMxKUmfeRA4WisM6G3/XW6nwGeX6fX9qYaDa+CiUqpOkb2f6X3nar05R3kSuJQ=="],
+
+    "playwright-core": ["playwright-core@1.61.0", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-caX7TrY3Ml6egyDX0WUcTHDxodl/b51y5wJOdCEA36QviK/s2g081hvmGs8eaE3DWb6NYZQ6BjO/QkNRPenoPA=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
   }

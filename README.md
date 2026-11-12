@@ -1,89 +1,113 @@
 # rexweb
 
-![rexweb in dark mode with three terminal panes arranged in nested splits](docs/screenshot.jpg)
+A single-binary Linux terminal service with an embedded browser client and a Rex-compatible native endpoint. Web, remote Rex and local Rex clients operate on the same sessions, tabs and tiled panes. The service runs as one unprivileged account, in the foreground, under systemd or directly from a terminal.
 
-This is an experiment of mine to understand the [Rex](https://www.superlogical.com) terminal multiplexer terminal and provide persistent, sandboxed terminal sessions with a Go server and a browser client built from my [`webterm`](https://github.com/rcarmo/webterm) components and [`ghostty-web`](https://github.com/rcarmo/ghostty-web).
+Based on [rcarmo/rexweb](https://github.com/rcarmo/rexweb), with its webterm components and pinned Ghostty WASM renderer. Independent of Superlogical Rex. No proprietary Rex executable is bundled.
 
-Like Rex, you can manage sessions, tabs and nested splits in a Rex-inspired interface. Resize panes live, switch sessions with **⌘K / Ctrl+K**, and open the command palette with **⇧⌘P / Ctrl+Shift+P** in a web UI that follows the system's light or dark appearance.
+## Build and run
 
-The server currently runs on MacOS, and shell isolation requires `/usr/bin/sandbox-exec`. Its supported protocol subset is described in [SPEC.md](SPEC.md#connect-rex-betaapp), and of course, this project is independent of Superlogical Rex (I'm just a fan, but I prefer web interfaces, which is why I based most of this off of [`webterm`](https://github.com/rcarmo/webterm)).
-
-## Build from source
-
-For now, build and run locally on macOS. Install Go 1.24 or later, Bun 1.3.13 or later, Git and `make` (available with Xcode Command Line Tools), then clone the repository:
+Build dependencies: Go 1.24 or later, Bun, Git and make. Runtime: Linux, `/bin/sh` (or your chosen shell), system tools and unprivileged user namespaces. No Bun, Docker, external sandbox program, frontend directory or Go installation is needed on the target machine.
 
 ```sh
-git clone https://github.com/rcarmo/rexweb.git
-cd rexweb
 make install-dev
 make build
 bin/rexweb
 ```
 
-Open [http://127.0.0.1:8080](http://127.0.0.1:8080). The server starts or reconnects to the session daemon and creates a default shell when the daemon has no sessions.
+Open <http://127.0.0.1:8080>. The binary works from any working directory. Browser disconnects leave shells running; reconnects replay up to 512 KiB per pane. Stopping or restarting the service ends shells and discards the in-memory layout and output. Workspace files remain on disk. Set `-workspace` to reuse a private directory outside the service account's home; the default is a fresh temporary directory whose path is logged at startup.
 
-Bun downloads my pinned [`ghostty-web`](https://github.com/rcarmo/ghostty-web) fork, including its compiled JavaScript and WASM, and just vendors it in.
-
-## Binary releases
-
-CI is disabled until we can ship to Linux. Once CI and release publishing are working, you'll be able to download a binary archive for your platform from [GitHub Releases](https://github.com/rcarmo/rexweb/releases), verify its SHA-256 digest against `SHA256SUMS`, extract it and run `bin/rexweb` from the extracted directory. The archive will include the frontend, so running it will need neither Go nor Bun.
-
-Keep the archive's directory structure intact. The default `-web-dir web/dist` is relative to the working directory. To launch from another directory, supply an absolute `-web-dir` path. The current macOS packaging produces unsigned binaries that are not notarised.
-
-## Sessions and isolation
-
-Since I abhor running local agents but had to test this alongside the official Rex Beta, I had to sandbox it and each shell starts in a private workspace outside your account home. `HOME` and `TMPDIR` point inside that workspace. The macOS sandbox blocks outbound networking and file contents outside the workspace and permitted system paths. Startup verifies isolation before accepting sessions. See [SECURITY.md](SECURITY.md) for the trust boundary.
-
-Right now, the gateway and daemon are separate processes. Stopping the gateway leaves sessions running; reopening it reconnects to the same daemon. Stopping the daemon ends its shells. Layout and retained output live in daemon memory, with up to 512 KiB of recent output per pane. Workspace files persist until you remove them; the default location is temporary storage.
-
-In the future, I hope to turn this into a Linux-only server, since for me the value of Rex is not so much having a good native desktop terminal but a decent way to manage sessions and reconnect to them (so besides Web I'm also thinking about `mosh`, but that's just wishful thinking right now).
-
-Options that affect shell creation apply when a new daemon starts:
+## Choose listeners
 
 ```sh
-# Use zsh in an existing private directory outside the account home.
-bin/rexweb -shell /bin/zsh -workspace /private/tmp/my-terminal-workspace
+# Browser plus private local Rex socket (default).
+rexweb -mode web
 
-# Use an independent daemon and workspace.
-mkdir -m 700 /private/tmp/my-rexweb-run
-bin/rexweb -session-socket /private/tmp/my-rexweb-run/session.sock
+# Native Rex TCP plus private local Rex socket; no browser listener.
+rexweb -mode rex -rex-listen 127.0.0.1:7297
+
+# Browser and native Rex TCP, sharing sessions.
+rexweb -mode both -listen 127.0.0.1:8080 -rex-listen 127.0.0.1:7297
 ```
 
-* For a daemon managed in the foreground, run `bin/rexweb -serve-sessions` in a separate terminal, then launch the gateway. Give both commands the same absolute `-session-socket` path when overriding it. Stop a foreground daemon with Ctrl-C. 
-* For an automatically started daemon, find the PID holding `daemon.lock` beside its socket and send SIGTERM to that PID. On macOS the default directory is `$HOME/Library/Caches/rexweb`; inspect `daemon.log` there for its workspace path. Confirm the socket path before stopping a daemon, since doing so ends its sessions.
+The local socket defaults to `$XDG_RUNTIME_DIR/rexweb/session.sock`, falling back to the user's cache directory when XDG_RUNTIME_DIR is unset. Its directory is private and its mode is 0600. A lifetime lock prevents two services from replacing the same socket. Use `-session-socket /absolute/private/path/session.sock` to choose another instance. The socket speaks the native Rex protocol, not the browser REST API.
 
-Run `bin/rexweb -help` for options and `bin/rexweb -version` for build information. The web UI uses port **8080**. The optional native Rex endpoint that I am using for interop testing uses a separate port, conventionally **7297**, and does not serve the web UI.
-
-## Native Rex client
-
-To enable native clients when starting a new daemon:
+With the official Rex CLI installed separately:
 
 ```sh
-bin/rexweb -rex-listen 127.0.0.1:7297
+rex -S /run/user/1000/rexweb/session.sock --autostart=false ls
+rex -S /run/user/1000/rexweb/session.sock --autostart=false new work
+rex -S /run/user/1000/rexweb/session.sock --autostart=false split -s work
+rex -S /run/user/1000/rexweb/session.sock --autostart=false send -s work 'ls'
+rex -S /run/user/1000/rexweb/session.sock --autostart=false send-key -s work enter
 ```
 
-The Rex endpoint is loopback-only, disabled by default, and unauthenticated. See [SPEC.md](SPEC.md) for protocol and retention details.
+In Rex.app, add `http://127.0.0.1:7297` as a remote host when native TCP is enabled. The adapter supports Rex protocol revision 12: session management, tabs, tiled splits, terminal input and output. Newer clients must support revision 12.
 
-Add `http://127.0.0.1:7297` as a remote host in Rex Beta.app. Compatibility was tested against Rex `0.1.0-preview.14`, app build 1925, control API revision 12. Sessions, tabs, tiled splits and terminal streaming work within that subset. Each pane supports one live viewer at a time.
+One live viewer per pane is supported. Close a browser pane/tab viewer before attaching that pane from Rex, or use another pane. Native resume, floating panes, Lua, command-layout options, capture/screen reconstruction, the full automation/discovery API and multi-user login are unsupported. Unsupported methods fail explicitly. See [SPEC.md](SPEC.md).
 
-Native stream resume, floating panes, Lua configuration, remote authentication and the full automation API are unsupported, and quite honestly do very little for me, so I am unlikely to pursue the entire feature set.
+## Remote access
 
-Also, paste RPC isn't working.
-
-## Development and releases
+Prefer SSH forwarding. It adds authentication and encryption without exposing a shell service to the network:
 
 ```sh
-make build       # Go executable and browser bundle
-make test        # Go and frontend unit tests
-make check       # TypeScript, layout tests, go vet and Go tests
-make race        # Go race detector
-make smoke       # Sandboxed PTYs, reconnects, native protocol and daemon startup
-make release     # Both macOS archives, checksums and an extracted-package smoke test
-make clean       # Remove build and release output
+# On the server, run -mode both. On your computer:
+ssh -N user@server -L 8080:127.0.0.1:8080 -L 7297:127.0.0.1:7297
 ```
 
-`make release` builds local archives in `dist/` using [VERSION](VERSION). See [RELEASING.md](RELEASING.md) for the planned GitHub draft-release workflow and [CONTRIBUTING.md](CONTRIBUTING.md) for change guidelines.
+Use <http://127.0.0.1:8080> in the browser or `http://127.0.0.1:7297` in Rex. Alternatively forward the private Unix socket for a native client. Anyone on the server who can reach a loopback TCP listener has access unless web password authentication is configured. Local socket permissions restrict access to its owner.
 
-## Licence
+For direct remote web access, use a private password file and TLS:
 
-Project code is under the [MIT licence](LICENSE), copyright 2026 Rui Carmo. Bundled dependencies and fonts retain their respective licences. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) records their sources and notices; copies are included in release archives and the built frontend.
+```sh
+umask 077
+openssl rand -base64 32 > /private/config/web-password
+rexweb -mode web -listen 0.0.0.0:8443 \
+  -public-url https://terminal.example:8443 \
+  -password-file /private/config/web-password \
+  -tls-cert /private/config/fullchain.pem -tls-key /private/config/key.pem
+```
+
+Log in as `rexweb` with the password in the file. Use a valid certificate for the external hostname. Host and Origin checks use the exact `-public-url`. Certificate/password files are read at startup; restart after rotating them. `-allow-insecure-http` permits a remote HTTP listener only when explicitly selected; use it behind a trusted TLS-terminating proxy that preserves Host, Origin and Authorization and proxies WebSocket upgrades. Forwarded identity headers are never trusted.
+
+Native Rex has no password authentication. Non-loopback native TCP requires `-allow-anonymous`, which grants every reachable client full service access. Bind it only on a trusted VPN with access controls; prefer SSH. `-tls-cert` and `-tls-key` enable TLS on both TCP listeners when supplied, but TLS alone does not authenticate native clients. Never expose anonymous native Rex to the public internet.
+
+## Shell permissions
+
+The default `-isolation sandbox` restricts shells to the workspace and read-only system tools, with no network access. It requires unprivileged Linux user namespaces and refuses to start if isolation is unavailable. Some distributions, including recent Ubuntu, require a local policy allowing these namespaces.
+
+For terminals that need the server account's normal files, installed tools and network access, select this explicitly:
+
+```sh
+rexweb -mode both -isolation host -workspace /srv/private/rexweb-work
+```
+
+**Host mode grants full service-account permissions to every connected client and its programs.** Both modes use an explicit environment and workspace-local `.home` and `.tmp` directories. They do not inherit service secrets or your normal shell startup files. Root execution is refused. Sandbox panes share workspace files and are not mutually untrusted tenants. See [SECURITY.md](SECURITY.md) for the trust boundary and limitations.
+
+## systemd
+
+Examples are in [deploy/](deploy/). For a dedicated system account:
+
+```sh
+sudo useradd --system --home-dir /var/lib/rexweb --shell /usr/sbin/nologin rexweb
+sudo install -m 0755 bin/rexweb /usr/local/bin/rexweb
+sudo install -m 0644 deploy/rexweb.service /etc/systemd/system/rexweb.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now rexweb
+journalctl -u rexweb -f
+```
+
+The unit creates private directories `/run/rexweb`, `/var/lib/rexweb` (the account home) and `/var/lib/rexweb-work` (the separate workspace). Do not start a system service as root. To access its private Unix socket, run the client as the service account (for example through `sudo -u rexweb`).
+
+Use `systemctl edit rexweb` to replace ExecStart with your listener/isolation options. Stopping the unit terminates the whole control group. A user-unit example is included for a personal server; install the binary at `~/.local/bin/rexweb` and the unit as `~/.config/systemd/user/rexweb.service`, then `systemctl --user enable --now rexweb`. Its default workspace is the private `/var/tmp/rexweb-UID-work` directory outside your home. Enable lingering with `loginctl enable-linger` if it must remain running while logged out.
+
+## Verify and package
+
+```sh
+make check                  # TypeScript, Go vet, unit tests
+make race                   # Go race detector
+make smoke                  # Linux isolation, PTYs, reconnects, native protocol, auth and modes
+REX_REFERENCE_BIN=/path/to/rex make smoke  # Also test the official CLI
+make release                # Static Linux ARM64/AMD64 archives, SHA256SUMS, extracted-native smoke
+```
+
+`-version` prints build information; `-help` lists all flags. `-web-dir` optionally overrides embedded assets for frontend development. Releases contain the binary, systemd examples, documentation and third-party notices. See [RELEASING.md](RELEASING.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Project code uses the [MIT licence](LICENSE).

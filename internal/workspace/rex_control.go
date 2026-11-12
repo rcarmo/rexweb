@@ -338,6 +338,8 @@ func (s *rexServer) call(c *rexClient, method string, payload json.RawMessage) (
 		return nil, invalid("arguments")
 	}
 	switch method {
+	case "target.resolve":
+		return s.resolveTargets(payload)
 	case "server.version":
 		return fields{"rex_version": "0.1.0-rexweb.1", "platform": runtime.GOOS + "_" + runtime.GOARCH,
 			"api_revision": rexRevision, "api_min_revision": rexRevision, "dirty": false}, nil
@@ -388,6 +390,8 @@ func (s *rexServer) call(c *rexClient, method string, payload json.RawMessage) (
 		"session.focus_window", "session.focus_block", "session.close_window", "block.close",
 		"session.new_split", "session.resize_pane":
 		return s.mutate(method, a)
+	case "session.describe_block", "session.list_blocks":
+		return s.describeBlocks(a, method == "session.describe_block")
 	case "data.connect":
 		if !c.attached[a.Session] {
 			return nil, &rexError{"conflict", "attach to the session first", 409}
@@ -412,7 +416,7 @@ func (s *rexServer) call(c *rexClient, method string, payload json.RawMessage) (
 			a.Method = strings.TrimPrefix(method, rexTerminalCreator+".")
 			return s.terminalCall(c, "block.method", a)
 		}
-		return nil, &rexError{"method_not_found", "unknown Rex method", 404}
+		return nil, &rexError{"method_not_found", "unknown Rex method: " + method, 404}
 	}
 }
 
@@ -592,7 +596,7 @@ func (s *rexServer) creator() fields {
 		"name": rexTerminalCreator, "title": "Terminal", "description": "An interactive shell in the workspace", "host_id": s.store.hostID,
 		"flavors": []fields{{"name": "shell", "flavor": rexShellFlavor, "title": "Shell",
 			"description": "An interactive shell", "options_schema": fields{"type": "object"}}},
-		"api": fields{"methods": fields{}, "events": fields{}},
+		"api": terminalAPI(),
 	}
 }
 

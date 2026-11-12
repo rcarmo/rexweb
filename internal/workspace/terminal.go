@@ -3,7 +3,10 @@ package workspace
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -58,12 +61,38 @@ func startPane(sandbox Sandbox, shell string) (*pane, error) {
 	}
 	cmd := sandbox.command(slave.Name(), shell, "-i")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = slave, slave, slave
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.Setsid, cmd.SysProcAttr.Setctty = true, true
+	var readyRead, readyWrite *os.File
+	if runtime.GOOS == "linux" && !sandbox.host {
+		readyRead, readyWrite, err = os.Pipe()
+		if err != nil {
+			master.Close()
+			return nil, err
+		}
+		defer readyRead.Close()
+		defer readyWrite.Close()
+		cmd.ExtraFiles = []*os.File{readyWrite}
+	}
 	if err := cmd.Start(); err != nil {
 		master.Close()
 		return nil, err
 	}
-
+	if readyRead != nil {
+		readyWrite.Close()
+		readyRead.SetReadDeadline(time.Now().Add(5 * time.Second))
+		// The helper marks fd 3 close-on-exec. EOF means successful exec; an
+		// error message or deadline means no pane is admitted into the Store.
+		message, setupErr := io.ReadAll(io.LimitReader(readyRead, 4096))
+		if setupErr != nil || len(message) != 0 {
+			cmd.Process.Kill()
+			cmd.Wait()
+			master.Close()
+			return nil, fmt.Errorf("start sandboxed shell: %s (%v)", strings.TrimSpace(string(message)), setupErr)
+		}
+	}
 	file, err := pollableMaster(master)
 	master.Close()
 	if err != nil {

@@ -1,21 +1,16 @@
 # Contributing
 
-Keep changes focused on the issue being addressed. Follow [AGENTS.md](AGENTS.md) and the behaviour described in [SPEC.md](SPEC.md).
+Keep changes focused. Follow [AGENTS.md](AGENTS.md) and [SPEC.md](SPEC.md). Preserve explicit remote-access opt-ins, private socket permissions, browser Host/Origin checks and fail-closed sandboxing.
 
-The backend uses Go. The frontend uses Bun and the existing webterm terminal component. Preserve the sandbox, loopback restrictions, private daemon socket and browser origin checks. Use disposable workspaces outside the account home for integration tests.
-
-The repository layout is:
-
-- `cmd/rexweb/`: executable entry point and daemon startup.
-- `internal/workspace/`: session, sandbox, terminal and protocol code, with Go tests alongside it.
-- `web/`: frontend source, assets, Bun dependencies, lockfile, TypeScript configuration and unit tests.
-- `tests/`: integration and release smoke tests.
+- `cmd/rexweb/`: CLI flags, listeners, HTTP security and service lifecycle.
+- `internal/workspace/`: session layouts, PTYs, Linux namespaces and Rex protocol.
+- `web/`: embedded Bun frontend, webterm source and Ghostty dependencies.
+- `deploy/`: systemd examples.
+- `tests/`: Linux integration and extracted-release verification.
 - `scripts/`: release packaging.
-- `docs/`: documentation images.
-- `licenses/`: retained third-party notices.
 
-Install dependencies with `make install-dev`. Before submitting a change, run `make check` and `make build`. Run `make race` for concurrent Go changes and `make smoke` for session, sandbox, streaming or protocol changes. Include the checks you ran and any untested behaviour in the pull request.
+Run `make install-dev`, then `make build` before Go tests: `web/embed.go` needs generated `web/dist`. Build order is explicit in the Makefile. Bun is only a build/test dependency. Use `make check`, `make race` and `make smoke`; integration tests require unprivileged Linux user namespaces. Never silently skip isolation tests on unsupported hosts. Set `REX_REFERENCE_BIN=/path/to/rex` to test against an independently installed official CLI.
 
-`make build` writes the executable to `bin/rexweb` and the browser bundle to `web/dist/`. Use `make build-go` or `make build-web` to build either part separately, and `make test` for Go and frontend unit tests. Run Bun commands from `web/`, including `bun install --frozen-lockfile`, `bun run typecheck` and `bun run build`. `make clean` removes `bin/`, `dist/` and `web/dist/` while retaining installed dependencies.
+`make release` cross-compiles static Linux ARM64/AMD64 binaries and tests the native extracted executable from an empty directory. Keep generated output and dependencies out of Git. Frontend modifications must retain the pinned security fixes, vendor provenance and licences in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Retain upstream notices when updating vendored code, dependencies or fonts, and update [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Contributions to project code are provided under the repository's MIT licence.
+For browser regressions, install Chromium with `cd web && bunx playwright install chromium`, then run `make browser-smoke`. This checks the shared mobile keyboard with multiple panes. Set `BROWSER_CDP_URL` to use an existing development browser instead.

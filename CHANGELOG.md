@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Linux service
+
+- One foreground service with embedded frontend, web/rex/both modes and a private local Rex socket.
+- Built-in Linux namespace shell sandbox, explicit full-account host mode and fail-closed shell setup.
+- Remote web password/TLS/Origin policy and explicit anonymous native networking.
+- Graceful HTTP/WebSocket shutdown, systemd examples and static ARM64/AMD64 releases.
+- Linux termios, Rex target resolution/block descriptions and official CLI interoperability tests.
+- Linux CI, integration/security smoke and extracted-single-binary release verification.
+- One shared mobile keyboard with focused-pane paste/IME handling and bounded Unicode input frames.
+- Normalised CRLF in native Rex paste events.
+- Removed detached gateway autostart; service restarts now end sessions.
+
+
 ## 0.1.0-preview.1
 
 Initial preview:

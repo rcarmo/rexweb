@@ -1,32 +1,12 @@
 # Releasing rexweb
 
-Release archives target macOS on Apple Silicon and Intel. Both include the Go executable, built frontend, documentation and third-party notices. They are unsigned and are not notarised.
+Release archives target Linux ARM64 and AMD64. Each contains one static Go executable with embedded JavaScript, WASM, fonts and licences, plus documentation and systemd examples. Neither archive needs a separate frontend at runtime.
 
-## Prepare
+1. Update `VERSION` and `CHANGELOG.md`.
+2. Run `make install-dev build check race smoke release` on Linux with unprivileged user namespaces enabled.
+3. Set `REX_REFERENCE_BIN` to repeat smoke/release tests against an official Rex CLI when available.
+4. Review `dist/SHA256SUMS`, archive contents, notices and native extracted-package test results. Run smoke tests on both target architectures.
 
-1. Update `VERSION` and the corresponding entry in `CHANGELOG.md`.
-2. Install locked dependencies with `make install-dev`.
-3. Run `make check race smoke release` on macOS. The package test extracts the native archive and checks its version, assets, default session and HTTP endpoint.
-4. Review `dist/SHA256SUMS`, the archive contents and licence notices. Keep generated archives, `bin/`, `web/node_modules/` and `web/dist/` out of Git.
+The CI matrix tests Ubuntu ARM64 and AMD64. Its disposable runners explicitly enable unprivileged user namespaces for isolation tests; production hosts need an appropriate local policy. The release workflow packages on Linux after both verification jobs pass, checks the tag against VERSION and creates a draft GitHub release. These workflows need to be enabled in the target repository. `make release` only creates local archives.
 
-The CI workflow runs checks, race detection and sandbox smoke tests on macOS ARM64 and Intel. The release workflow requires those jobs to pass before packaging.
-
-## GitHub setup
-
-Create the GitHub repository, add it as this checkout's `origin`, and push the `main` branch. Enable private vulnerability reporting in the repository's security settings. Set an appropriate repository description and review Actions permissions.
-
-The release job needs the workflow token's `contents: write` permission to create a draft and attach assets. Other jobs use read-only repository permissions. No signing credentials or long-lived publishing token are required.
-
-## Create a draft
-
-Commit the release preparation, then tag that exact commit:
-
-```sh
-version=$(cat VERSION)
-git tag -a "v$version" -m "rexweb $version"
-git push origin "v$version"
-```
-
-Pushing a `v*` tag starts `.github/workflows/release.yml`. The workflow checks that the tag matches `VERSION`, runs CI, builds both archives and creates a **draft** GitHub release. The initial `0.1.0-preview.1` draft is marked as a prerelease. Preview, alpha, beta and release-candidate version strings are marked as prereleases automatically.
-
-Review the generated notes and assets in GitHub, then publish the draft when ready. If a tag already has a release, the workflow fails instead of replacing its assets. Fix the problem and use a new version for an already published release.
+Tag a release commit with `v$(cat VERSION)` and push the tag to start the release workflow. GitHub Actions uses its short-lived workflow token, with contents:write only on the packaging job. Review the draft before publishing. Replace neither published tags nor published archives; issue a new version instead.

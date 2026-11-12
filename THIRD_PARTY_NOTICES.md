@@ -16,7 +16,7 @@ The project's MIT licence applies to its own code. The following components reta
 | Gorilla WebSocket | [v1.5.3](https://github.com/gorilla/websocket/tree/v1.5.3) | [BSD-2-Clause](licenses/gorilla-websocket-BSD-2-Clause.txt), copyright 2013 The Gorilla WebSocket Authors |
 | FiraCode Nerd Font | Fira Code 6.002, patched with Nerd Fonts 3.4.0, as recorded in the font's name table | [SIL OFL 1.1](licenses/FiraCode-OFL-1.1.txt), [Nerd Fonts notices](licenses/nerd-fonts-LICENSE.txt), and retained glyph notices below |
 
-The webterm component has local changes for multiple-pane lifecycle and focus, byte-offset replay and reconnects, and throttled terminal fitting during live resizing. The CSS is adapted for the workspace. Their original MIT notice is retained.
+The webterm component has local changes for multiple-pane lifecycle and focus, byte-offset replay and reconnects, throttled terminal fitting during live resizing, and a shared mobile keyboard helper routed to the focused pane, clipboard/IME handling and bounded Unicode input frames. The CSS is adapted for the workspace. Their original MIT notice is retained.
 
 ## Font glyph notices
 

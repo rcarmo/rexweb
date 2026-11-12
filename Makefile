@@ -1,4 +1,4 @@
-.PHONY: install-dev typecheck build build-web build-go test check race smoke release clean
+.PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke release clean
 .DEFAULT_GOAL := build
 
 VERSION ?= $(shell cat VERSION)
@@ -10,27 +10,30 @@ install-dev:
 typecheck:
 	cd web && bun run typecheck
 
-build: build-web build-go
+build: build-go
 
 build-web:
 	cd web && bun run build
 
-build-go:
-	go build -o bin/rexweb ./cmd/rexweb
+build-go: build-web
+	CGO_ENABLED=0 go build -o bin/rexweb ./cmd/rexweb
 
-test:
+test: build-web
 	go test ./...
 	cd web && bun test
 
-check: typecheck
+check: build-web
 	go vet ./...
 	$(MAKE) test
 
-race:
+race: build-web
 	go test -race ./...
 
-smoke: build-web
+smoke: build-go
 	sh tests/rex-smoke.sh
+
+browser-smoke: build-go
+	bun tests/browser-smoke.ts
 
 release: build-web
 	sh scripts/release.sh "$(VERSION)"

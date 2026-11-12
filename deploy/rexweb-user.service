@@ -1,0 +1,18 @@
+[Unit]
+Description=Personal Rexweb terminal service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/rexweb -mode both -session-socket %t/rexweb/session.sock -workspace /var/tmp/rexweb-%U-work
+RuntimeDirectory=rexweb
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+KillMode=control-group
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

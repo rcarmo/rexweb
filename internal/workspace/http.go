@@ -40,7 +40,7 @@ func respond(w http.ResponseWriter, result any, err error) {
 	json.NewEncoder(w).Encode(result)
 }
 
-// Handler is served only on the daemon's private Unix socket.
+// Handler supplies browser routes; the service applies authentication and Origin checks.
 func (s *Store) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/sessions", s.list)

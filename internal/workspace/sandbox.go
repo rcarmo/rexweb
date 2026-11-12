@@ -11,49 +11,22 @@ import (
 	"strings"
 )
 
-const seatbelt = "/usr/bin/sandbox-exec"
-
-const shellProfile = `
-(version 1)
-(deny default)
-(allow syscall*)
-(import "dyld-support.sb")
-(allow process-fork)
-(allow signal (target same-sandbox))
-(allow sysctl-read)
-(allow file-read-metadata)
-(allow process-exec file-map-executable
-  (subpath (param "WORKSPACE"))
-  (subpath "/bin") (subpath "/sbin") (subpath "/usr/bin") (subpath "/usr/sbin"))
-(allow file-map-executable (subpath "/System/Library") (subpath "/usr/lib"))
-(allow file-read*
-  (subpath (param "WORKSPACE"))
-  (subpath "/System/Library") (subpath "/usr/lib") (subpath "/usr/share")
-  (subpath "/bin") (subpath "/sbin") (subpath "/usr/bin") (subpath "/usr/sbin")
-  (literal "/private/etc/localtime") (subpath "/private/var/db/timezone")
-  (literal "/private/etc/zshenv") (literal "/private/etc/zshrc")
-  (literal "/dev/null") (literal "/dev/zero")
-  (literal "/dev/random") (literal "/dev/urandom")
-  (literal "/dev/tty") (literal (param "TTY")))
-(allow file-write* (subpath (param "WORKSPACE")))
-(allow file-write-data file-ioctl
-  (literal "/dev/null") (literal "/dev/zero")
-  (literal "/dev/tty") (literal (param "TTY")))
-(allow mach-lookup (global-name "com.apple.system.logger"))
-`
-
 // Sandbox holds the directory and environment shared by sandboxed shells.
-type Sandbox struct{ root string }
+type Sandbox struct {
+	root  string
+	stage string
+	host  bool
+}
 
 func (s Sandbox) Root() string { return s.root }
 
-// PrepareSandbox fails before the daemon listens if its shell policy cannot be applied.
-func PrepareSandbox(root, socketDir string) (Sandbox, error) {
-	if runtime.GOOS != "darwin" {
-		return Sandbox{}, errors.New("sandboxed sessions currently require macOS and sandbox-exec")
+// PrepareEnvironment checks workspace permissions and verifies the shell boundary.
+func PrepareEnvironment(root, socketDir string, host bool) (Sandbox, error) {
+	if runtime.GOOS != "linux" {
+		return Sandbox{}, errors.New("sessions require Linux")
 	}
 	if os.Geteuid() == 0 {
-		return Sandbox{}, errors.New("run the session daemon as an unprivileged user")
+		return Sandbox{}, errors.New("run the service as an unprivileged user")
 	}
 	account, err := user.Current()
 	if err != nil {
@@ -64,7 +37,7 @@ func PrepareSandbox(root, socketDir string) (Sandbox, error) {
 		return Sandbox{}, fmt.Errorf("resolve the account home: %w", err)
 	}
 	if root == "" {
-		root, err = os.MkdirTemp("/private/tmp", "rexweb-workspace-")
+		root, err = os.MkdirTemp("", "rexweb-workspace-")
 		if err != nil {
 			return Sandbox{}, err
 		}
@@ -101,11 +74,18 @@ func PrepareSandbox(root, socketDir string) (Sandbox, error) {
 	probe.Close()
 	defer os.Remove(probe.Name())
 
-	sandbox := Sandbox{root: root}
+	stage := filepath.Join(runDir, "sandbox-root")
+	if err := privateDirectory(stage); err != nil {
+		return Sandbox{}, err
+	}
+	sandbox := Sandbox{root: root, stage: stage, host: host}
+	if host {
+		return sandbox, nil
+	}
 	cmd := sandbox.command("/dev/null", "/bin/sh", "-c",
 		`test -w "$HOME" && ! /bin/cat "$1" >/dev/null 2>&1`, "sandbox-check", probe.Name())
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return Sandbox{}, fmt.Errorf("verify macOS shell sandbox: %w: %s", err, strings.TrimSpace(string(output)))
+		return Sandbox{}, fmt.Errorf("verify shell sandbox: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return sandbox, nil
 }
@@ -165,8 +145,12 @@ func privateDirectory(dir string) error {
 }
 
 func (s Sandbox) command(tty, program string, args ...string) *exec.Cmd {
-	argv := []string{"-p", shellProfile, "-D", "WORKSPACE=" + s.root, "-D", "TTY=" + tty, program}
-	cmd := exec.Command(seatbelt, append(argv, args...)...)
+	var cmd *exec.Cmd
+	if s.host {
+		cmd = exec.Command(program, args...)
+	} else {
+		cmd = s.linuxCommand(tty, program, args...)
+	}
 	cmd.Dir = s.root
 	home := filepath.Join(s.root, ".home")
 	cmd.Env = []string{

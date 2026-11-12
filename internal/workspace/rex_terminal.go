@@ -413,7 +413,7 @@ func (s *rexServer) blockEvent(p *pane, a rexArgs, send func(string) error) erro
 				return ' '
 			}
 			return r
-		}, paste.Text)
+		}, strings.ReplaceAll(paste.Text, "\r\n", "\n"))
 		if text != "" && p.modes().paste {
 			text = "\x1b[200~" + text + "\x1b[201~"
 		}
