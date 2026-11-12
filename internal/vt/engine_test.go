@@ -146,3 +146,23 @@ func TestHTMLLinkPolicy(t *testing.T) {
 		t.Fatal(string(html))
 	}
 }
+
+func TestResetClearsMetadata(t *testing.T) {
+	engine := testEngine(t)
+	state, err := engine.NewTerminal(context.Background(), 40, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer state.Close()
+	_, err = state.Feed([]byte("\x1b]7501;state=working:id=task\x07\x1b]133;A\x07"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = state.Feed([]byte("\x1bc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Info().Records) != 0 || len(state.Info().Prompts) != 0 {
+		t.Fatal("reset retained stale metadata")
+	}
+}

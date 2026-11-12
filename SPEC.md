@@ -45,4 +45,10 @@ Mobile input remains a single shared textarea/keybar. Its anchor follows the foc
 
 The server embeds the same Ghostty WASM as the browser bundle and executes it through wazero, without CGO or an external runtime. Each pane has an independent module with a 64 MiB memory cap and bounded calls; output is fed before publication. Native `format`/`blob_read` and the browser capture endpoint read this state without requiring a viewer. Browser command-palette exports support text, HTML and VT. Captures cover the active screen and its retained history (2000 lines/16 MiB, page-granular pruning), with a 4 MiB export cap. Native chunks obey encoded JSON limits; at most 4 MiB of temporary blobs is retained per pane. HTML export is sanitised and supplied with an offline CSP.
 
-Headless query replies are used only when no live viewer owns the stream; the connected viewer's existing reply path is preserved. Capture does not imply service-restart session persistence or a stable native snapshot wire format.
+The server is authoritative for terminal query replies. The embedded browser sets emitTerminalResponses=false so replay and live parser activity cannot generate duplicate replies. Capture does not imply service-restart session persistence or a stable native snapshot wire format.
+
+## Program and prompt effects
+
+The server records bounded OSC 7501 statuses and reported title/pwd using Ghostty callbacks. HTTP session views carry a separate terminal_metadata extension for browser badges, leaving native Rex session-view shapes unchanged. Native program_status/title/pwd read the same metadata. Records and prompt events are cleared on VT reset; process exit and VT failure are reflected in browser state.
+
+Default supported shells receive OSC 133 PS1 hooks. Browser Previous/Next prompt navigation uses the client's core marks, temporarily reading core scroll positions and restoring the live viewport before updating external scroll state. No shell input is emitted.

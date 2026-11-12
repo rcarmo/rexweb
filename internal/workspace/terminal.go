@@ -205,16 +205,15 @@ func (p *pane) publish(data []byte) {
 	if p.updates != nil && !p.lagging {
 		p.sendUpdate(paneUpdate{output: append([]byte(nil), data...)})
 	}
-	// Preserve the connected client's reply ownership. Headless terminals
-	// still answer queries when no live viewer can do so.
-	replyHeadless := p.updates == nil || p.lagging
+	// The server is authoritative for query replies. The embedded browser
+	// renderer disables local replies to avoid duplicate terminal input.
 	failed := p.stateErr != nil
 	p.mu.Unlock()
 	if failed && p.process != nil {
 		p.process.Kill()
 		return
 	}
-	if replyHeadless && len(replies) > 0 {
+	if len(replies) > 0 {
 		p.write(string(replies))
 	}
 }
@@ -359,4 +358,44 @@ func (p *pane) metadata() vt.Info {
 		return vt.Info{Records: []vt.Status{}, Prompts: []vt.Prompt{}}
 	}
 	return p.state.Info()
+}
+
+func (p *pane) metadataSummary() fields {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	info := vt.Info{}
+	if p.state != nil {
+		info = p.state.Info()
+	}
+	result := fields{"title": info.Title, "pwd": info.PWD, "revision": info.Revision, "state": ""}
+	priority := map[string]int{"idle": 1, "done": 2, "working": 3, "blocked": 4, "error": 5}
+	var selected vt.Status
+	rank := 0
+	for _, record := range info.Records {
+		if priority[record.State] > rank {
+			selected = record
+			rank = priority[record.State]
+		}
+	}
+	if rank > 0 {
+		result["state"] = selected.State
+		result["app"] = selected.App
+		result["message"] = selected.Message
+		result["status_title"] = selected.Title
+		if selected.Progress >= 0 {
+			result["progress"] = selected.Progress
+		}
+	}
+	if p.finished {
+		result["state"] = "done"
+		result["message"] = fmt.Sprintf("Exited with status %d", p.exitCode)
+		if p.exitCode != 0 {
+			result["state"] = "error"
+		}
+	}
+	if p.stateErr != nil {
+		result["state"] = "error"
+		result["message"] = "Terminal state unavailable"
+	}
+	return result
 }

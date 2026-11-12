@@ -5,7 +5,7 @@ The project's MIT licence applies to its own code. The following components reta
 | Component | Version or source | Licence and retained notice |
 | --- | --- | --- |
 | webterm terminal component and styles | [fe3cc0340b5f4e86ec73ae5dcf311d78930134ec](https://github.com/rcarmo/webterm/tree/fe3cc0340b5f4e86ec73ae5dcf311d78930134ec) | MIT; [original notice](licenses/webterm-MIT.txt), copyright 2026 Rui Carmo |
-| ghostty-web JavaScript and WASM | [rcarmo fork, da088bb02755944d5429aaf22071712e0e23b227](https://github.com/rcarmo/ghostty-web/tree/da088bb02755944d5429aaf22071712e0e23b227) | [MIT](licenses/ghostty-web-MIT.txt), copyright 2025 Coder |
+| ghostty-web JavaScript and WASM | [rcarmo fork, 5219860f283b221d4f0f434ef2bbd5d158dadd13](https://github.com/rcarmo/ghostty-web/tree/5219860f283b221d4f0f434ef2bbd5d158dadd13) | [MIT](licenses/ghostty-web-MIT.txt), copyright 2025 Coder |
 | Ghostty VT core | Fork's submodule [c6174c88f42b48adb14857c9233b16f6947ab732](https://github.com/ghostty-org/ghostty/tree/c6174c88f42b48adb14857c9233b16f6947ab732) | [MIT](licenses/ghostty-MIT.txt), copyright 2024 Mitchell Hashimoto and Ghostty contributors |
 | Vendored libghostty-webgl | Version 0.0.1, author 0xBigBoss; included by ghostty-web | MIT as declared in the [retained upstream package metadata](licenses/ghostty-webgl-package.json); upstream has no separate licence file |
 | PNG decoding runtime | ghostty-web's vendored `@cf-wasm/png` 0.3.3 runtime, powered by denosaurs/pngs | [MIT](licenses/pngs-MIT.txt), copyright 2021 Denosaurs |

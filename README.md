@@ -32,6 +32,18 @@ terminal selection. Text paste retains sanitisation and bracketed-paste handling
 Large output is parsed cooperatively so the page can remain interactive;
 reconnect offsets and input readiness wait for parser consumption.
 
+## Program status and prompts
+
+Panes show reported working, blocked, done or error states, optional progress,
+and terminal titles/cwd. These come from OSC 7501/OSC 0/2/7 reports; the service
+does not guess arbitrary applications' activity. Native Rex `program_status`,
+`title` and `pwd` read the same server-side state.
+
+The command palette offers **Previous prompt** and **Next prompt**. Supported
+default sh/bash/zsh shells emit OSC 133 prompt boundaries. Startup files can
+replace PS1; other shells need their own integration. Navigation follows marks
+retained in the focused renderer and sends no keyboard input to the shell.
+
 ## Capture and export
 
 The service keeps parsed VT state for every pane, even without a browser attached.
@@ -48,8 +60,8 @@ execution calls. Exports are limited to 4 MiB. Native Rex exports paginate large
 content with `max_bytes` and `blob_read`; retained export blobs are bounded and
 expire after five minutes. HTML exports are offline documents with unsafe links
 removed and scripts blocked. Capture describes the active screen; it does not
-keep shell processes alive across a service restart. When no viewer is attached,
-the service can answer terminal queries itself.
+keep shell processes alive across a service restart. The service owns terminal query replies; the embedded browser suppresses local
+parser replies to prevent duplicate input.
 
 ## Choose listeners
 

@@ -70,6 +70,11 @@ func (s *Store) view(w http.ResponseWriter, r *http.Request) {
 	var result fields
 	if item != nil {
 		result = item.view(s.hostID)
+		metadata := fields{}
+		for id, p := range item.panes {
+			metadata[id] = p.metadataSummary()
+		}
+		result["terminal_metadata"] = metadata
 	}
 	s.mu.Unlock()
 	if result == nil {
@@ -200,9 +205,13 @@ func (p *pane) readInput(ws *websocket.Conn, pongs chan<- json.RawMessage) {
 				return
 			}
 		case "resize":
-			var size struct{ Width, Height int }
+			var size struct {
+				Width, Height int
+				CellWidth     int `json:"cell_width"`
+				CellHeight    int `json:"cell_height"`
+			}
 			if json.Unmarshal(message[1], &size) != nil || size.Width < 2 || size.Width > 500 ||
-				size.Height < 1 || size.Height > 500 || p.resize(size.Width, size.Height) != nil {
+				size.Height < 1 || size.Height > 500 || size.CellWidth < 0 || size.CellWidth > 1024 || size.CellHeight < 0 || size.CellHeight > 1024 || p.resizeCells(size.Width, size.Height, size.CellWidth, size.CellHeight) != nil {
 				return
 			}
 		case "ping":

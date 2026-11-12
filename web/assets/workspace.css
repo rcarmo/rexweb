@@ -148,3 +148,9 @@ button.primary.danger { background: var(--danger); color: var(--raised); }
 #search-text { min-width: 70px; width: min(230px, 42vw); border: 1px solid var(--line); border-radius: 5px; background: var(--surface); padding: 6px; }
 #search-results { font-size: 11px; color: var(--muted); min-width: 55px; white-space: nowrap; }
 #search-bar button { padding: 4px 7px; }
+
+.pane-status { flex-shrink: 0; font-size: 10px; padding: 2px 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.pane-status[hidden] { display: none; }
+.pane-status[data-state="blocked"] { color: #b76b00; background: #d99d1b22; }
+.pane-status[data-state="error"] { color: var(--danger); background: #cc334422; }
+.pane-status[data-state="done"] { color: #268b55; background: #268b5522; }

@@ -651,6 +651,7 @@ class WebTerminal {
       cursorStyle: "block",
       theme: themeToUse,
       ghostty,
+      emitTerminalResponses: false,
     };
 
     const terminal = new Terminal(options);
@@ -738,7 +739,7 @@ class WebTerminal {
     this.terminal.onResize((size) => {
       if (this.isValidSize(size.cols, size.rows)) {
         this.lastValidSize = { cols: size.cols, rows: size.rows };
-        this.send(["resize", { width: size.cols, height: size.rows }]);
+        this.send(["resize", { width: size.cols, height: size.rows, cell_width:Math.round(this.terminal.renderer?.charWidth??0),cell_height:Math.round(this.terminal.renderer?.charHeight??0) }]);
         this.positionMobileInput();
       }
     });
@@ -1108,7 +1109,7 @@ class WebTerminal {
           if (!document.hidden) this.startHeartbeatWatchdog();
           const { cols, rows } = this.terminal;
           if (this.isValidSize(cols, rows))
-            this.send(["resize", { width: cols, height: rows }]);
+            this.send(["resize", { width: cols, height: rows, cell_width:Math.round(this.terminal.renderer?.charWidth??0),cell_height:Math.round(this.terminal.renderer?.charHeight??0) }]);
           if (this.autofocus) this.focus();
         });
         break;
@@ -1178,6 +1179,8 @@ class WebTerminal {
         ? this.searchAddon.findNext(text)
         : this.searchAddon.findPrevious(text);
   }
+
+  navigatePrompt(older=true):boolean {return !this.disposed&&this.terminal.scrollToPrompt(older);}
 
   clearSearch(): void {
     this.searchListener = undefined;

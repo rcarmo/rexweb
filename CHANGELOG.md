@@ -2,6 +2,9 @@
 
 ## Unreleased — Linux service
 
+- Added server-derived status/title/cwd badges, default-shell prompt marks and focused prompt navigation.
+- Made server VT query replies authoritative to avoid duplicate browser replies.
+
 - Added authoritative server-side Ghostty VT state, native Rex capture/pagination, and secure text/HTML/VT exports.
 
 - Added focused-pane search, cursor-anchored shared IME/native Copy, and cooperative replay-safe output parsing.

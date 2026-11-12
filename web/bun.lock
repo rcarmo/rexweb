@@ -5,7 +5,7 @@
     "": {
       "name": "webterm-frontend",
       "dependencies": {
-        "ghostty-web": "github:rcarmo/ghostty-web#da088bb02755944d5429aaf22071712e0e23b227",
+        "ghostty-web": "github:rcarmo/ghostty-web#5219860f283b221d4f0f434ef2bbd5d158dadd13",
       },
       "devDependencies": {
         "playwright": "1.61.0",
@@ -17,7 +17,7 @@
   "packages": {
     "fsevents": ["fsevents@2.3.2", "", { "os": "darwin", "hasInstallScript": true }, "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="],
 
-    "ghostty-web": ["ghostty-web@github:rcarmo/ghostty-web#da088bb", {}, "rcarmo-ghostty-web-da088bb", "sha512-f+n4QCupaM5dbSVqnDslcuCYEQvHwsmDcbmOZeXtkgcLe8HvUWI66M1CIPIytbJTooWWF7ASAwbBAndVFpBmVA=="],
+    "ghostty-web": ["ghostty-web@github:rcarmo/ghostty-web#5219860", {}, "rcarmo-ghostty-web-5219860", "sha512-xY9MElX7DLr9WCOk3n9hVhODVSmUTAhZ6UPhObn/f2szHmBoHktJJhUjUEZ24/KpdwvuI412lx1rPfQ+ugSd5A=="],
 
     "playwright": ["playwright@1.61.0", "", { "dependencies": { "playwright-core": "1.61.0" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha512-Z+7BeeqQPRRzklHsVFP4KTGIyMxKUmfeRA4WisM6G3/XW6nwGeX6fX9qYaDa+CiUqpOkb2f6X3nar05R3kSuJQ=="],
 

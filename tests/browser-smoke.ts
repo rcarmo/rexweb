@@ -203,6 +203,22 @@ try {
  await page.getByRole('button',{name:'Export terminal as text',exact:true}).click();
  const exported=await exportResponse;
  assert(exported.ok()&&(await exported.text()).includes('COPY-DESKTOP'),'command-palette export did not read the focused server terminal');
+ // Program reports are authoritative server metadata, not inferred from output.
+ await desktop.click();
+ await page.keyboard.type("printf '\\033]7501;state=working:progress=42:app=test-agent\\007'; printf '\\033]0;status-pane\\007'");await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>document.querySelector('.pane-status')?.textContent==='working 42%');
+ assert(await page.locator('.pane-label').first().textContent()==='status-pane','title metadata did not reach the pane header');
+ // Default supported shells emit OSC 133 marks. Navigation is client-side and
+ // must not type arrows or commands into the running shell.
+ await desktop.click();await page.keyboard.type("printf '\\033[?25l'; i=0; while [ $i -lt 80 ]; do printf 'ROW-%s\\n' $i; i=$((i+1)); done");await page.keyboard.press('Enter');
+ await page.waitForTimeout(300);
+ const promptCanvas=desktop.locator('canvas').first();const beforePrompt=await promptCanvas.evaluate(canvas=>(canvas as HTMLCanvasElement).toDataURL());
+ const beforeNavigation=frames.length;
+ await page.getByRole('button',{name:'Command palette',exact:true}).click();await page.locator('#chooser-filter').fill('Previous prompt');await page.getByRole('button',{name:'Previous prompt',exact:true}).click();
+ await page.waitForTimeout(100);
+ const afterPrompt=await promptCanvas.evaluate(canvas=>(canvas as HTMLCanvasElement).toDataURL());
+ assert(afterPrompt!==beforePrompt,'prompt navigation did not move the visible terminal');
+ assert(frames.length===beforeNavigation,'prompt navigation sent shell input');
  await checkReplay(page,`http://${address}`);
  await checkRenderer(page);
  assert(!errors.length,"browser exceptions: "+errors.join("; "));

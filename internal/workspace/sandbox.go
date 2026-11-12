@@ -164,5 +164,16 @@ func (s Sandbox) command(tty, program string, args ...string) *exec.Cmd {
 		"COLORTERM=truecolor",
 		"LANG=en_US.UTF-8",
 	}
+	// Default shells emit prompt boundaries without exposing the daemon socket.
+	// Startup files may override PS1; unsupported shells can install their own OSC 133 hooks.
+	switch filepath.Base(program) {
+	case "sh", "dash":
+		cmd.Env = append(cmd.Env, "PS1=\x1b]133;A\x07$ \x1b]133;B\x07")
+	case "bash":
+		cmd.Env = append(cmd.Env, "PS1=\\[\x1b]133;A\x07\\]$ \\[\x1b]133;B\x07\\]")
+	case "zsh":
+		cmd.Env = append(cmd.Env, "PS1=%{\x1b]133;A\x07%}$ %{\x1b]133;B\x07%}")
+	}
+
 	return cmd
 }

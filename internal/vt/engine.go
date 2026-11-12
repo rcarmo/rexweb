@@ -139,6 +139,14 @@ func (e *Engine) NewTerminal(ctx context.Context, cols, rows uint32) (_ *State, 
 		return nil, err
 	}
 	host := s.runtime.NewHostModuleBuilder("rexweb_host")
+	host.NewFunctionBuilder().WithFunc(func(context.Context, api.Module, uint32, uint32) {
+		s.records = make(map[string]Status)
+		s.info.Prompts = nil
+		s.info.Title = ""
+		s.dirtyTitle = true
+		s.dirtyPWD = true
+		s.info.Revision++
+	}).Export("reset")
 	host.NewFunctionBuilder().WithFunc(s.writePTY).Export("write_pty")
 	host.NewFunctionBuilder().WithFunc(s.programStatus).Export("program_status")
 	host.NewFunctionBuilder().WithFunc(s.semanticPrompt).Export("semantic_prompt")
@@ -207,7 +215,7 @@ func (e *Engine) NewTerminal(ctx context.Context, cols, rows uint32) (_ *State, 
 	if err != nil {
 		return nil, err
 	}
-	for export, option := range map[string]string{"install_write": "WRITE_PTY", "install_status": "PROGRAM_STATUS", "install_prompt": "SEMANTIC_PROMPT", "install_title": "TITLE_CHANGED", "install_pwd": "PWD_CHANGED", "install_size": "SIZE"} {
+	for export, option := range map[string]string{"install_write": "WRITE_PTY", "install_reset": "RESET", "install_status": "PROGRAM_STATUS", "install_prompt": "SEMANTIC_PROMPT", "install_title": "TITLE_CHANGED", "install_pwd": "PWD_CHANGED", "install_size": "SIZE"} {
 		values, err := s.shim.ExportedFunction(export).Call(ctx)
 		if err != nil || len(values) != 1 || uint32(values[0]) == ^uint32(0) {
 			return nil, fmt.Errorf("install VT callback %s: %v", export, err)
@@ -358,7 +366,7 @@ func (s *State) programStatus(_ context.Context, _ api.Module, _ uint32, _ uint3
 		s.callbackErr = errors.New("invalid program status")
 		return
 	}
-	record := Status{State: s.enumName("GhosttyProgramStatusState", state), Kind: s.enumName("GhosttyProgramStatusKind", kind), Progress: int(int8(p)), ID: s.stringAt(s.member(ptr, t, "id"), 256), App: s.stringAt(s.member(ptr, t, "app"), 256), Title: s.stringAt(s.member(ptr, t, "title"), 1024), Message: s.stringAt(s.member(ptr, t, "message"), 4096)}
+	record := Status{State: s.enumName("GhosttyProgramStatusState", state), Kind: s.enumName("GhosttyProgramStatusKind", kind), Progress: int(int8(p)), ID: s.stringAt(s.member(ptr, t, "id"), 128), App: s.stringAt(s.member(ptr, t, "app"), 128), Title: s.stringAt(s.member(ptr, t, "title"), 256), Message: s.stringAt(s.member(ptr, t, "message"), 1024)}
 	if record.State == "clear" {
 		delete(s.records, record.ID)
 	} else if _, exists := s.records[record.ID]; exists || len(s.records) < 32 {
@@ -379,7 +387,7 @@ func (s *State) get32(ctx context.Context, key string) (uint32, error) {
 func (s *State) semanticPrompt(ctx context.Context, _ api.Module, _ uint32, _ uint32, ptr uint32) {
 	t := "GhosttyTerminalSemanticPrompt"
 	kind, _ := s.read32(s.member(ptr, t, "kind"))
-	mark := Prompt{Kind: s.enumName("GhosttySemanticPromptKind", kind), Command: s.stringAt(s.member(ptr, t, "command"), 4096)}
+	mark := Prompt{Kind: s.enumName("GhosttySemanticPromptKind", kind), Command: s.stringAt(s.member(ptr, t, "command"), 512)}
 	total, err := s.get32(ctx, "TOTAL_ROWS")
 	if err != nil {
 		s.callbackErr = err

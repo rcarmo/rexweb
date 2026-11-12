@@ -18,7 +18,9 @@ interface WorkspaceWindow {
   layers: { kind: string; layout: Layout | null; blocks: Block[] | null }[] | null;
 }
 
+interface TerminalMetadata { title:string; pwd:string; revision:number; state:string; app?:string; message?:string; status_title?:string; progress?:number; }
 interface View extends Session {
+  terminal_metadata?:Record<string,TerminalMetadata>;
   revision: number;
   active_window_id?: string;
   windows: WorkspaceWindow[] | null;
@@ -167,6 +169,16 @@ async function api<T>(path: string, body?: Record<string, unknown>): Promise<T> 
   return response.json();
 }
 
+function updateMetadata(next:View) {
+  for(const [id,metadata] of Object.entries(next.terminal_metadata??{})){
+    const pane=panes.get(id);if(!pane)continue;
+    const label=pane.element.querySelector<HTMLElement>('.pane-label');
+    if(label){label.textContent=metadata.title||'Shell';label.title=metadata.pwd||'';}
+    const badge=pane.element.querySelector<HTMLElement>('.pane-status');
+    if(badge){badge.hidden=!metadata.state||metadata.state==='idle';badge.dataset.state=metadata.state;badge.textContent=metadata.state+(metadata.progress!==undefined?` ${metadata.progress}%`:'');badge.title=metadata.message||metadata.status_title||metadata.app||metadata.state;}
+  }
+}
+
 function selectSession(id: string) {
   if (id === sessionId) return;
   sessionId = id;
@@ -196,6 +208,7 @@ async function refresh() {
         view = next;
         render();
       }
+      updateMetadata(next);
     }
     status.textContent = id ? "" : "Create or select a session.";
   } catch (error) {
@@ -241,7 +254,8 @@ function mountPane(block: Block, rect: Rect, keep: Set<string>) {
     title.className = "pane-title";
     const label = document.createElement("span");
     label.className = "pane-label";
-    title.append(icon("terminal"), label);
+    const badge=document.createElement('span');badge.className='pane-status';badge.hidden=true;
+    title.append(icon("terminal"), label, badge);
     const actions = document.createElement("div");
     actions.className = "pane-actions";
     for (const [op, name, glyph] of [
@@ -461,6 +475,10 @@ function render() {
 
 function runCommand(op: string, block = activeWindow?.focused_block_id, initialName = "") {
   chooser.close();
+  if(op==='previous-prompt'||op==='next-prompt'){
+    if(!panes.get(block??'')?.terminal?.navigatePrompt(op==='previous-prompt'))status.textContent='No retained prompt in that direction.';
+    focusTerminal();return;
+  }
   if(op==='export-text'||op==='export-html'||op==='export-vt'){void exportFocused(op.slice(7) as 'text'|'html'|'vt');return;}
   if (op === "create" || op === "rename" || op === "destroy" || op === "close-block") {
     const naming = op === "create" || op === "rename";
@@ -509,6 +527,8 @@ function renderChooser() {
       { label: "New session", glyph: "plus", run: () => runCommand("create") },
       ...(view ? [
         { label: "New tab", glyph: "plus", run: () => runCommand("new-window") },
+        { label: "Previous prompt", glyph: "terminal", run: () => runCommand("previous-prompt") },
+        { label: "Next prompt", glyph: "terminal", run: () => runCommand("next-prompt") },
         { label: "Export terminal as text", glyph: "terminal", run: () => runCommand("export-text") },
         { label: "Export terminal as HTML", glyph: "terminal", run: () => runCommand("export-html") },
         { label: "Export terminal as VT", glyph: "terminal", run: () => runCommand("export-vt") },
