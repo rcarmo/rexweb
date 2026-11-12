@@ -2,6 +2,8 @@
 
 ## Unreleased — Linux service
 
+- Updated ghostty-web and its official Ghostty 1.4.1-dev core; rebuilt with Zig 0.17.0.
+
 - One foreground service with embedded frontend, web/rex/both modes and a private local Rex socket.
 - Built-in Linux namespace shell sandbox, explicit full-account host mode and fail-closed shell setup.
 - Remote web password/TLS/Origin policy and explicit anonymous native networking.
