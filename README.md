@@ -23,8 +23,12 @@ Enter moves to an older match; Shift+Enter moves to a newer match. The arrow
 buttons do the same, and Escape closes search. Switching panes changes the
 search target. Search covers the active screen and retained history loaded in
 that renderer, not every session or output already discarded by the server.
-It matches literal text with ASCII case folding; regex and whole-word search
-are not supported. Queries are limited to 1024 characters.
+Literal matching uses ASCII case folding. The search bar also offers case-sensitive,
+whole-word and regex modes. Advanced searches use a linear-time RE2JS matcher,
+not JavaScript backtracking regex; unsupported syntax is shown as an error.
+Snapshots are built cooperatively, with limits of 500,000 cells/1 MiB of text
+and 10,000 matches. Partial counts are marked with '+'. Queries are limited
+to 1024 characters.
 
 One shared mobile keyboard/input follows the active pane's cursor, including
 horizontal movement, scrolling and resizing. Native Copy uses the current

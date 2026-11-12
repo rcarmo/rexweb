@@ -54,6 +54,16 @@ try {
  assert(await page.locator("#search-results").textContent()==="0 matches","search leaked from the other pane");
  await panes.nth(0).locator(".webterm-terminal").click();
  await page.waitForFunction(()=>document.querySelector("#search-results")?.textContent==="1 / 1");
+ await page.locator('#search-case').check();await page.locator('#search-text').fill('search-leftonly');
+ await page.waitForFunction(()=>document.querySelector('#search-results')?.textContent==='0 matches');
+ await page.locator('#search-case').uncheck();await page.locator('#search-regex').check();await page.locator('#search-text').fill('SEARCH-(LEFT|RIGHT)ONLY');
+ await page.waitForFunction(()=>document.querySelector('#search-results')?.textContent==='1 / 1');
+ await page.locator('#search-text').fill('(a)\\1');
+ await page.waitForFunction(()=>document.querySelector('#search-results')?.textContent==='Invalid expression');
+ await page.locator('#search-regex').uncheck();await page.locator('#search-word').check();await page.locator('#search-text').fill('LEFT');
+ await page.waitForFunction(()=>document.querySelector('#search-results')?.textContent==='0 matches');
+ await page.locator('#search-word').uncheck();await page.locator('#search-text').fill('SEARCH-LEFTONLY');
+ await page.waitForFunction(()=>document.querySelector('#search-results')?.textContent==='1 / 1');
  await page.getByRole("searchbox",{name:"Find in focused pane",exact:true}).focus();
  await page.keyboard.press("Escape");
  assert(await page.locator("#search-bar").isHidden(),"Escape did not close search");

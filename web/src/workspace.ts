@@ -52,6 +52,9 @@ const searchBar = document.querySelector<HTMLElement>("#search-bar")!;
 const searchText = document.querySelector<HTMLInputElement>("#search-text")!;
 const searchResults =
   document.querySelector<HTMLOutputElement>("#search-results")!;
+const searchCase=document.querySelector<HTMLInputElement>('#search-case')!;
+const searchWord=document.querySelector<HTMLInputElement>('#search-word')!;
+const searchRegex=document.querySelector<HTMLInputElement>('#search-regex')!;
 let searchTerminal: WebTerminal | undefined;
 let searchTimer: number | undefined;
 
@@ -68,11 +71,12 @@ function runSearch(older?: boolean) {
   }
   target.search(searchText.value, older, (result) => {
     if (searchBar.hidden || target !== searchTerminal) return;
-    searchResults.textContent = result.resultCount
-      ? `${result.resultIndex + 1} / ${result.resultCount}`
-      : "0 matches";
-  });
+    searchResults.textContent=result.error?'Invalid expression':result.pending?'Searching…':result.resultCount?`${result.resultIndex+1} / ${result.resultCount}${result.truncated?'+':''}`:'0 matches';
+    searchResults.title=result.error??(result.truncated?'Search limit reached; results are partial.':'');
+  },{regex:searchRegex.checked,caseSensitive:searchCase.checked,wholeWord:searchWord.checked});
 }
+for(const option of [searchCase,searchWord,searchRegex])option.addEventListener('change',()=>runSearch());
+
 function openSearch() {
   if (chooser.open || actionDialog.open) return;
   searchBar.hidden = false;

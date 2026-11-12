@@ -154,3 +154,8 @@ button.primary.danger { background: var(--danger); color: var(--raised); }
 .pane-status[data-state="blocked"] { color: #b76b00; background: #d99d1b22; }
 .pane-status[data-state="error"] { color: var(--danger); background: #cc334422; }
 .pane-status[data-state="done"] { color: #268b55; background: #268b5522; }
+
+#search-bar { flex-wrap: wrap; }
+.search-options { width: 100%; display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
+.search-options label { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.search-options input { margin: 0; }

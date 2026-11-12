@@ -37,7 +37,7 @@ Run `make check`, `make race`, `make smoke` and `make release`. Smoke tests cove
 
 ## Browser search and shared input
 
-The focused-pane search uses the core's literal search over the active screen and loaded history, with ASCII case folding, a 1024-character query limit, result counts and a selected-match highlight. It owns a separate decoration layer and frees native handles when panes reset or close. Switching panes clears the former target's highlight. Search never supplies terminal input or searches other sessions.
+The focused-pane search uses the core's literal search over the active screen and loaded history, with ASCII case folding, a 1024-character query limit, result counts and a selected-match highlight. It owns a separate decoration layer and frees native handles when panes reset or close. Switching panes clears the former target's highlight. Search never supplies terminal input or searches other sessions. Optional case-sensitive, whole-word and regex modes use cooperatively built text/cell snapshots and RE2JS linear-time matching, with generation cancellation and explicit pending/error/truncated result fields. Limits are 500,000 cells/1 MiB text and 10,000 matches. Historical soft wraps and complete combining graphemes map back to terminal cells; unsupported syntax is rejected.
 
 Mobile input remains a single shared textarea/keybar. Its anchor follows the focused pane's cursor and stays within the visible viewport. Native clipboard staging is user-initiated, uses the current selection, and clears staged text after Copy or subsequent input. No background clipboard reads are performed.
 

@@ -7,7 +7,7 @@
  */
 
 import { bindMobileKeyboard, isMobileDevice, type KeyboardBinding } from "./mobile-keyboard";
-import { Terminal, FitAddon, Ghostty, SearchAddon, type SearchResults, type ITerminalOptions, type ITheme } from "ghostty-web";
+import { Terminal, FitAddon, Ghostty, SearchAddon, type SearchResults, type SearchOptions, type ITerminalOptions, type ITheme } from "ghostty-web";
 
 /** Maximum queued messages before oldest are dropped */
 const MAX_MESSAGE_QUEUE_SIZE = 1000;
@@ -1184,14 +1184,15 @@ class WebTerminal {
     text: string,
     older?: boolean,
     onResults?: (result: SearchResults) => void,
+    options:SearchOptions={},
   ): boolean {
     if (this.disposed) return false;
     this.searchListener = onResults;
     return older === undefined
-      ? this.searchAddon.refresh(text)
+      ? this.searchAddon.refresh(text,options)
       : older
-        ? this.searchAddon.findNext(text)
-        : this.searchAddon.findPrevious(text);
+        ? this.searchAddon.findNext(text,options)
+        : this.searchAddon.findPrevious(text,options);
   }
 
   async uploadFile(file:File):Promise<void> {
