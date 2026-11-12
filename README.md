@@ -16,6 +16,22 @@ bin/rexweb
 
 Open <http://127.0.0.1:8080>. The binary works from any working directory. Browser disconnects leave shells running; reconnects replay up to 512 KiB per pane. Stopping or restarting the service ends shells and discards the in-memory layout and output. Workspace files remain on disk. Set `-workspace` to reuse a private directory outside the service account's home; the default is a fresh temporary directory whose path is logged at startup.
 
+## Search and input
+
+Use **Ctrl+F / ⌘F** or the magnifying-glass button to search the focused pane.
+Enter moves to an older match; Shift+Enter moves to a newer match. The arrow
+buttons do the same, and Escape closes search. Switching panes changes the
+search target. Search covers the active screen and retained history loaded in
+that renderer, not every session or output already discarded by the server.
+It matches literal text with ASCII case folding; regex and whole-word search
+are not supported. Queries are limited to 1024 characters.
+
+One shared mobile keyboard/input follows the active pane's cursor, including
+horizontal movement, scrolling and resizing. Native Copy uses the current
+terminal selection. Text paste retains sanitisation and bracketed-paste handling.
+Large output is parsed cooperatively so the page can remain interactive;
+reconnect offsets and input readiness wait for parser consumption.
+
 ## Choose listeners
 
 ```sh

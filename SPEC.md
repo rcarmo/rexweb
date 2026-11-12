@@ -10,7 +10,7 @@ SIGINT/SIGTERM closes HTTP servers, hijacked WebSockets and panes. Shells and la
 
 The Store owns session labels, ordered window tabs, nested binary horizontal/vertical splits, ratios and focus. Browser state handles presentation, selection and the last consumed stream byte offset. Each pane has a PTY, one live viewer and 512 KiB of retained output. Panes that exit retain output until closed.
 
-Browser attachment sends `stream` metadata, retained binary bytes, `ready`, and live bytes. A valid retained offset resumes without duplication; offsets outside retention reset the renderer. Slow viewers detach when the bounded output queue fills. Browser input is suppressed while replaying and discarded on disconnect. The bundled frontend retains the upstream webterm lifecycle and Ghostty renderer.
+Browser attachment sends `stream` metadata, retained binary bytes, `ready`, and live bytes. A valid retained offset resumes without duplication; offsets outside retention reset the renderer. Slow viewers detach when the bounded output queue fills. Browser input is suppressed while replaying and discarded on disconnect. Output parsing is ordered and time-budgeted; consumed offsets advance only in parser completion callbacks. Input readiness and replacement transports wait behind parser barriers, so a disconnect during queued replay cannot claim bytes not yet consumed. Parser failure resets the renderer and resumes from a fresh retained replay. The bundled frontend retains the upstream webterm lifecycle and Ghostty renderer.
 
 ## Native Rex
 
@@ -34,3 +34,9 @@ Creation accepts one initial shell tab; custom command layouts and initial input
 Default shell isolation uses Linux namespaces and fails closed. Host isolation is a deliberate full-account option. Remote web requires password authentication and a fixed public origin. Remote native TCP requires anonymous-access opt-in. See [SECURITY.md](SECURITY.md) for precise boundaries.
 
 Run `make check`, `make race`, `make smoke` and `make release`. Smoke tests cover execution from an empty directory, embedded assets/WASM, sandbox file/network/socket denial, capability drop, PTY resizing, reconnect offsets, nested splits, native wire streams, shared layouts, mode selection, web authentication and shutdown. Set `REX_REFERENCE_BIN` for optional official CLI tests over both native transports.
+
+## Browser search and shared input
+
+The focused-pane search uses the core's literal search over the active screen and loaded history, with ASCII case folding, a 1024-character query limit, result counts and a selected-match highlight. It owns a separate decoration layer and frees native handles when panes reset or close. Switching panes clears the former target's highlight. Search never supplies terminal input or searches other sessions.
+
+Mobile input remains a single shared textarea/keybar. Its anchor follows the focused pane's cursor and stays within the visible viewport. Native clipboard staging is user-initiated, uses the current selection, and clears staged text after Copy or subsequent input. No background clipboard reads are performed.

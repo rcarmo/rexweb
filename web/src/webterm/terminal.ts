@@ -7,7 +7,7 @@
  */
 
 import { bindMobileKeyboard, isMobileDevice, type KeyboardBinding } from "./mobile-keyboard";
-import { Terminal, FitAddon, Ghostty, type ITerminalOptions, type ITheme } from "ghostty-web";
+import { Terminal, FitAddon, Ghostty, SearchAddon, type SearchResults, type ITerminalOptions, type ITheme } from "ghostty-web";
 
 /** Maximum queued messages before oldest are dropped */
 const MAX_MESSAGE_QUEUE_SIZE = 1000;
@@ -538,8 +538,18 @@ class WebTerminal {
   private fontSize: number;
   private cleanupTimer: number | undefined;
   private resizeObserver: ResizeObserver | null = null;
-  private boundHandlers: { target: EventTarget; type: string; handler: EventListener; options?: boolean | AddEventListenerOptions }[] = [];
+  private boundHandlers: {
+    target: EventTarget;
+    type: string;
+    handler: EventListener;
+    options?: boolean | AddEventListenerOptions;
+  }[] = [];
   private streamOffset: number | undefined;
+  private streamEpoch = 0;
+  private connectPending = false;
+  private searchAddon = new SearchAddon();
+  private searchListener?: (result: SearchResults) => void;
+  private mobilePositionFrame?: number;
   private ready = false;
   private exited = false;
   private baseTitle: string;
@@ -555,7 +565,7 @@ class WebTerminal {
     fontSize: number,
     routeKey: string,
     baseTitle: string,
-    private readonly autofocus: boolean
+    private readonly autofocus: boolean,
   ) {
     this.element = container;
     this.wsUrl = wsUrl;
@@ -572,7 +582,7 @@ class WebTerminal {
     target: EventTarget,
     type: string,
     handler: EventListener,
-    options?: boolean | AddEventListenerOptions
+    options?: boolean | AddEventListenerOptions,
   ): void {
     target.addEventListener(type, handler, options);
     this.boundHandlers.push({ target, type, handler, options });
@@ -623,10 +633,10 @@ class WebTerminal {
   static async create(
     container: HTMLElement,
     wsUrl: string,
-    config: TerminalConfig
+    config: TerminalConfig,
   ): Promise<WebTerminal> {
     const ghostty = await getSharedGhostty();
-    
+
     // Build terminal options
     const themeToUse = config.theme ?? THEMES.tango;
     const fontFamily = config.fontFamily?.trim() || DEFAULT_FONT_FAMILY;
@@ -650,9 +660,10 @@ class WebTerminal {
     // Open terminal (initializes rendering - WASM already loaded)
     terminal.open(container);
 
-    const routeKey = container.dataset.sessionRouteKey
-      ?? new URLSearchParams(window.location.search).get("route_key")
-      ?? "";
+    const routeKey =
+      container.dataset.sessionRouteKey ??
+      new URLSearchParams(window.location.search).get("route_key") ??
+      "";
     const rawTitle = container.dataset.sessionName?.trim() || document.title;
     const baseTitle = rawTitle.startsWith(`${BELL_EMOJI} `)
       ? rawTitle.slice(BELL_EMOJI.length + 1)
@@ -666,7 +677,7 @@ class WebTerminal {
       fontSize,
       routeKey,
       baseTitle,
-      config.autofocus ?? true
+      config.autofocus ?? true,
     );
     instance.initialize();
     return instance;
@@ -683,12 +694,15 @@ class WebTerminal {
     //    - Re-measures font metrics and triggers a full re-render
     this.waitForFonts().then(() => {
       if (this.disposed) return;
-      if (typeof (this.terminal as unknown as { loadFonts?: () => void }).loadFonts === "function") {
+      if (
+        typeof (this.terminal as unknown as { loadFonts?: () => void })
+          .loadFonts === "function"
+      ) {
         (this.terminal as unknown as { loadFonts: () => void }).loadFonts();
       }
       this.fit();
     });
-    
+
     // Setup resize observer (we use our own fit method, not FitAddon's)
     this.setupResizeObserver();
 
@@ -696,6 +710,13 @@ class WebTerminal {
     this.addTrackedListener(window, "resize", () => {
       this.fit();
     });
+
+    this.terminal.loadAddon(this.searchAddon);
+    this.searchAddon.onDidChangeResults((result) =>
+      this.searchListener?.(result),
+    );
+    this.terminal.onWriteError(() => this.failStream());
+    this.terminal.onWriteParsed(() => this.positionMobileInput());
 
     // Handle terminal input
     this.terminal.onData((data) => {
@@ -718,13 +739,54 @@ class WebTerminal {
       if (this.isValidSize(size.cols, size.rows)) {
         this.lastValidSize = { cols: size.cols, rows: size.rows };
         this.send(["resize", { width: size.cols, height: size.rows }]);
+        this.positionMobileInput();
       }
     });
 
     // Setup mobile keyboard support
-    if (isMobileDevice()) this.mobileKeyboard = bindMobileKeyboard(this.element, text => this.sendStdin(text), text => { if (this.ready) this.terminal.paste(text); });
+    if (isMobileDevice())
+      this.mobileKeyboard = bindMobileKeyboard(
+        this.element,
+        (text) => {
+          this.terminal.clearSelection();
+          this.sendStdin(text);
+        },
+        (text) => {
+          if (this.ready) this.terminal.paste(text);
+        },
+        () => this.cursorAnchor(),
+        () => this.terminal.getSelection(),
+        () => this.terminal.copySelection(),
+      );
     this.setupTouchSelection();
-
+    this.addTrackedListener(this.element, "contextmenu", () => {
+      if (this.mobileKeyboard) this.mobileKeyboard.prepareCopy();
+      else this.prepareNativeCopy();
+    });
+    this.addTrackedListener(this.element, "copy", ((event: ClipboardEvent) => {
+      const text = this.terminal.getSelection();
+      if (text && event.clipboardData) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.clipboardData.setData("text/plain", text);
+        if (this.terminal.textarea) this.terminal.textarea.value = "";
+      }
+    }) as EventListener);
+    this.addTrackedListener(
+      this.element,
+      "keydown",
+      ((event: KeyboardEvent) => {
+        if (
+          !(
+            (event.ctrlKey || event.metaKey) &&
+            event.key.toLowerCase() === "c"
+          ) &&
+          this.terminal.textarea
+        )
+          this.terminal.textarea.value = "";
+      }) as EventListener,
+      { capture: true },
+    );
 
     // Start periodic resource cleanup
     this.startResourceCleanup();
@@ -771,7 +833,10 @@ class WebTerminal {
     const canvas = this.element.querySelector("canvas");
     if (!canvas) return;
 
-    const dispatchMouse = (type: "mousedown" | "mousemove" | "mouseup", touch: Touch) => {
+    const dispatchMouse = (
+      type: "mousedown" | "mousemove" | "mouseup",
+      touch: Touch,
+    ) => {
       const rect = canvas.getBoundingClientRect();
       const event = new MouseEvent(type, {
         bubbles: true,
@@ -792,7 +857,7 @@ class WebTerminal {
         dispatchMouse("mousedown", e.touches[0]);
         e.preventDefault();
       }) as EventListener,
-      { passive: false }
+      { passive: false },
     );
 
     this.addTrackedListener(
@@ -803,7 +868,7 @@ class WebTerminal {
         dispatchMouse("mousemove", e.touches[0]);
         e.preventDefault();
       }) as EventListener,
-      { passive: false }
+      { passive: false },
     );
 
     this.addTrackedListener(
@@ -815,7 +880,7 @@ class WebTerminal {
         dispatchMouse("mouseup", touch);
         e.preventDefault();
       }) as EventListener,
-      { passive: false }
+      { passive: false },
     );
   }
 
@@ -831,7 +896,7 @@ class WebTerminal {
     }
   }
 
-  /** 
+  /**
    * Custom fit method that doesn't reserve space for scrollbar.
    * The FitAddon subtracts 15px for a scrollbar, but ghostty-web
    * uses canvas rendering without a visible scrollbar.
@@ -839,11 +904,13 @@ class WebTerminal {
   private fit(): void {
     // Try to get metrics from renderer (private but accessible at runtime)
     const termAny = this.terminal as unknown as Record<string, unknown>;
-    const renderer = termAny.renderer as { getMetrics?: () => { width: number; height: number } } | undefined;
-    
+    const renderer = termAny.renderer as
+      | { getMetrics?: () => { width: number; height: number } }
+      | undefined;
+
     let cellWidth: number;
     let cellHeight: number;
-    
+
     if (renderer?.getMetrics) {
       const metrics = renderer.getMetrics();
       if (metrics && metrics.width > 0 && metrics.height > 0) {
@@ -876,8 +943,10 @@ class WebTerminal {
     const paddingLeft = parseInt(style.paddingLeft) || 0;
     const paddingRight = parseInt(style.paddingRight) || 0;
 
-    const availableWidth = this.element.clientWidth - paddingLeft - paddingRight;
-    const availableHeight = this.element.clientHeight - paddingTop - paddingBottom;
+    const availableWidth =
+      this.element.clientWidth - paddingLeft - paddingRight;
+    const availableHeight =
+      this.element.clientHeight - paddingTop - paddingBottom;
 
     if (availableWidth <= 0 || availableHeight <= 0) {
       return;
@@ -893,19 +962,19 @@ class WebTerminal {
 
   /** Measure cell size by creating a test character */
   private measureCellSize(): { width: number; height: number } | null {
-    const testElement = document.createElement('span');
-    testElement.style.visibility = 'hidden';
-    testElement.style.position = 'absolute';
+    const testElement = document.createElement("span");
+    testElement.style.visibility = "hidden";
+    testElement.style.position = "absolute";
     testElement.style.fontFamily = this.fontFamily;
     testElement.style.fontSize = `${this.fontSize}px`;
-    testElement.style.lineHeight = 'normal';
-    testElement.textContent = 'W';
-    
+    testElement.style.lineHeight = "normal";
+    testElement.textContent = "W";
+
     document.body.appendChild(testElement);
     const width = testElement.offsetWidth;
     const height = testElement.offsetHeight;
     document.body.removeChild(testElement);
-    
+
     if (width > 0 && height > 0) {
       return { width, height };
     }
@@ -934,10 +1003,32 @@ class WebTerminal {
 
   /** Connect to WebSocket server */
   connect(): void {
-    if (this.disposed || this.exited || this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
+    if (
+      this.disposed ||
+      this.exited ||
+      this.socket?.readyState === WebSocket.OPEN ||
+      this.socket?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
+    if (this.connectPending) return;
+    this.connectPending = true;
+    const epoch = this.streamEpoch;
+    this.terminal.write("", () => {
+      this.connectPending = false;
+      if (
+        epoch === this.streamEpoch &&
+        !this.disposed &&
+        !this.exited &&
+        this.socket?.readyState !== WebSocket.OPEN &&
+        this.socket?.readyState !== WebSocket.CONNECTING
+      )
+        this.openSocket();
+    });
+  }
+
+  private openSocket(): void {
     const gen = ++this.socketGeneration;
     const url = new URL(this.wsUrl, window.location.href);
     if (this.streamOffset !== undefined) {
@@ -963,18 +1054,29 @@ class WebTerminal {
 
     this.socket.addEventListener("message", (event) => {
       if (gen !== this.socketGeneration) return;
-      this.handleMessage(event.data);
+      this.handleMessage(event.data, gen);
     });
   }
 
   /** History and live bytes share the same cursor. Only live output may generate input. */
-  private handleMessage(data: string | ArrayBuffer): void {
+  private handleMessage(data: string | ArrayBuffer, generation: number): void {
     this.lastMessageAt = Date.now();
     if (data instanceof ArrayBuffer) {
       if (this.streamOffset === undefined) return;
       const bytes = new Uint8Array(data);
-      this.terminal.write(bytes);
-      this.streamOffset += bytes.byteLength;
+      const epoch = this.streamEpoch;
+      try {
+        this.terminal.write(bytes, () => {
+          if (
+            epoch === this.streamEpoch &&
+            generation === this.socketGeneration &&
+            this.streamOffset !== undefined
+          )
+            this.streamOffset += bytes.byteLength;
+        });
+      } catch {
+        this.failStream();
+      }
       return;
     }
 
@@ -982,21 +1084,33 @@ class WebTerminal {
     switch (kind) {
       case "stream": {
         const stream = payload as { offset: number; reset: boolean };
-        if (stream.reset && this.streamOffset !== undefined) this.terminal.reset();
+        this.streamEpoch++;
+        this.ready = false;
+        if (stream.reset && this.streamOffset !== undefined)
+          this.terminal.reset();
         this.streamOffset = stream.offset;
         break;
       }
       case "ready": {
-        this.ready = true;
-        this.reconnectAttempts = 0;
-        this.element.classList.add("-connected");
-        this.element.classList.remove("-disconnected");
-        if (!document.hidden) this.startHeartbeatWatchdog();
-        const { cols, rows } = this.terminal;
-        if (this.isValidSize(cols, rows)) {
-          this.send(["resize", { width: cols, height: rows }]);
-        }
-        if (this.autofocus) this.terminal.focus();
+        const epoch = this.streamEpoch;
+        this.terminal.write("", () => {
+          if (
+            this.disposed ||
+            epoch !== this.streamEpoch ||
+            generation !== this.socketGeneration ||
+            this.socket?.readyState !== WebSocket.OPEN
+          )
+            return;
+          this.ready = true;
+          this.reconnectAttempts = 0;
+          this.element.classList.add("-connected");
+          this.element.classList.remove("-disconnected");
+          if (!document.hidden) this.startHeartbeatWatchdog();
+          const { cols, rows } = this.terminal;
+          if (this.isValidSize(cols, rows))
+            this.send(["resize", { width: cols, height: rows }]);
+          if (this.autofocus) this.focus();
+        });
         break;
       }
       case "pong":
@@ -1008,6 +1122,66 @@ class WebTerminal {
         this.element.classList.add("-exited");
         break;
     }
+  }
+
+  private failStream(): void {
+    if (this.disposed) return;
+    this.ready = false;
+    this.connectPending = false;
+    this.streamEpoch++;
+    this.streamOffset = undefined;
+    this.pendingStdin = "";
+    this.terminal.reset();
+    this.socket?.close();
+  }
+
+  private cursorAnchor(): { left: number; top: number; height: number } {
+    const renderer = this.terminal.renderer;
+    const canvas = renderer?.getCanvas();
+    const rect = (canvas ?? this.element).getBoundingClientRect();
+    const metrics = renderer?.getMetrics() ?? { width: 1, height: 16 };
+    const cursor = this.terminal.wasmTerm?.getCursor() ?? { x: 0, y: 0 };
+    return {
+      left: rect.left + cursor.x * metrics.width,
+      top: rect.top + cursor.y * metrics.height,
+      height: metrics.height,
+    };
+  }
+
+  private positionMobileInput(): void {
+    if (!this.mobileKeyboard || this.mobilePositionFrame !== undefined) return;
+    this.mobilePositionFrame = requestAnimationFrame(() => {
+      this.mobilePositionFrame = undefined;
+      if (!this.disposed) this.mobileKeyboard?.updatePosition();
+    });
+  }
+
+  private prepareNativeCopy(): void {
+    const text = this.terminal.getSelection();
+    const input = this.terminal.textarea;
+    if (!text || !input) return;
+    input.value = text;
+    input.focus({ preventScroll: true });
+    input.select();
+  }
+
+  search(
+    text: string,
+    older?: boolean,
+    onResults?: (result: SearchResults) => void,
+  ): boolean {
+    if (this.disposed) return false;
+    this.searchListener = onResults;
+    return older === undefined
+      ? this.searchAddon.refresh(text)
+      : older
+        ? this.searchAddon.findNext(text)
+        : this.searchAddon.findPrevious(text);
+  }
+
+  clearSearch(): void {
+    this.searchListener = undefined;
+    if (!this.disposed) this.searchAddon.clearDecorations();
   }
 
   private startHeartbeatWatchdog(): void {
@@ -1100,7 +1274,7 @@ class WebTerminal {
     this.pendingStdin = "";
     // Bound JSON messages below the server's 64 KiB read limit, including
     // worst-case escaping, without splitting UTF-16 surrogate pairs.
-    for (let start = 0; start < chunk.length;) {
+    for (let start = 0; start < chunk.length; ) {
       let end = Math.min(start + STDIN_BATCH_MAX_CHARS, chunk.length);
       const last = chunk.charCodeAt(end - 1);
       if (end < chunk.length && last >= 0xd800 && last <= 0xdbff) end--;
@@ -1118,7 +1292,9 @@ class WebTerminal {
     }
 
     if (this.messageQueue.length >= MAX_MESSAGE_QUEUE_SIZE) {
-      this.messageQueue = this.messageQueue.slice(-Math.floor(MAX_MESSAGE_QUEUE_SIZE / 2));
+      this.messageQueue = this.messageQueue.slice(
+        -Math.floor(MAX_MESSAGE_QUEUE_SIZE / 2),
+      );
       console.warn("[webterm] Message queue overflow; trimmed old messages");
     }
     this.messageQueue.push(message);
@@ -1158,7 +1334,9 @@ class WebTerminal {
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
 
     setTimeout(() => {
-      console.log(`[webterm] Reconnecting (attempt ${this.reconnectAttempts})...`);
+      console.log(
+        `[webterm] Reconnecting (attempt ${this.reconnectAttempts})...`,
+      );
       this.connect();
     }, delay);
   }
@@ -1166,6 +1344,10 @@ class WebTerminal {
   /** Clean up resources */
   dispose(): void {
     this.disposed = true;
+    this.streamEpoch++;
+    this.searchListener = undefined;
+    if (this.mobilePositionFrame !== undefined)
+      cancelAnimationFrame(this.mobilePositionFrame);
     this.socketGeneration++;
     this.stopResourceCleanup();
     this.stopHeartbeatWatchdog();
@@ -1207,7 +1389,8 @@ class WebTerminal {
   setTheme(theme: ITheme): void {
     // Use the Terminal's options proxy so handleOptionChange fires,
     // which updates the renderer theme AND triggers a re-render.
-    (this.terminal as unknown as { options: { theme: ITheme } }).options.theme = theme;
+    (this.terminal as unknown as { options: { theme: ITheme } }).options.theme =
+      theme;
   }
 
   /** Get a named theme from the built-in themes */

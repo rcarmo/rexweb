@@ -46,6 +46,73 @@ let sessionList: Session[] = [];
 let chooserMode: "sessions" | "commands" = "sessions";
 let pendingAction: (() => void) | undefined;
 
+const searchBar = document.querySelector<HTMLElement>("#search-bar")!;
+const searchText = document.querySelector<HTMLInputElement>("#search-text")!;
+const searchResults =
+  document.querySelector<HTMLOutputElement>("#search-results")!;
+let searchTerminal: WebTerminal | undefined;
+let searchTimer: number | undefined;
+
+function runSearch(older?: boolean) {
+  if (searchBar.hidden) return;
+  const target = panes.get(activeWindow?.focused_block_id ?? "")?.terminal;
+  if (target !== searchTerminal) {
+    searchTerminal?.clearSearch();
+    searchTerminal = target;
+  }
+  if (!target) {
+    searchResults.textContent = "No active pane";
+    return;
+  }
+  target.search(searchText.value, older, (result) => {
+    if (searchBar.hidden || target !== searchTerminal) return;
+    searchResults.textContent = result.resultCount
+      ? `${result.resultIndex + 1} / ${result.resultCount}`
+      : "0 matches";
+  });
+}
+function openSearch() {
+  if (chooser.open || actionDialog.open) return;
+  searchBar.hidden = false;
+  runSearch();
+  searchText.focus();
+  searchText.select();
+}
+function closeSearch() {
+  searchBar.hidden = true;
+  if (searchTimer !== undefined) clearTimeout(searchTimer);
+  searchTimer = undefined;
+  searchTerminal?.clearSearch();
+  searchTerminal = undefined;
+  focusTerminal();
+}
+document.querySelector("#find-pane")!.addEventListener("click", openSearch);
+document.querySelector("#search-close")!.addEventListener("click", closeSearch);
+document
+  .querySelector("#search-older")!
+  .addEventListener("click", () => runSearch(true));
+document
+  .querySelector("#search-newer")!
+  .addEventListener("click", () => runSearch(false));
+searchText.addEventListener("input", () => {
+  if (searchTimer !== undefined) clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {
+    searchTimer = undefined;
+    runSearch();
+  }, 80);
+});
+searchText.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    runSearch(!event.shiftKey);
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeSearch();
+  }
+});
+
 function icon(name: string) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.classList.add("icon");
@@ -69,7 +136,7 @@ function terminalTheme() {
 }
 
 function focusTerminal() {
-  if (!chooser.open && !actionDialog.open) {
+  if (!chooser.open && !actionDialog.open && searchBar.hidden) {
     panes.get(activeWindow?.focused_block_id ?? "")?.terminal?.focus();
   }
 }
@@ -195,7 +262,7 @@ function mountPane(block: Block, rect: Rect, keep: Set<string>) {
     void WebTerminal.create(terminal, url.href, { autofocus: false, fontSize: 14, theme: terminalTheme() }).then((instance) => {
       if (panes.get(id) === mounted) {
         mounted.terminal = instance;
-        if (activeWindow?.focused_block_id === id) focusTerminal();
+        if (activeWindow?.focused_block_id === id) { focusTerminal(); runSearch(); }
       }
       else instance.dispose();
     }).catch((error) => { terminal.textContent = String(error); });
@@ -376,7 +443,7 @@ function render() {
   document.querySelectorAll<HTMLButtonElement>("[data-session]").forEach((button) => {
     button.disabled = !view;
   });
-  if (previousBlock !== activeWindow?.focused_block_id) focusTerminal();
+  if (previousBlock !== activeWindow?.focused_block_id) { focusTerminal(); runSearch(); }
 }
 
 function runCommand(op: string, block = activeWindow?.focused_block_id, initialName = "") {
@@ -524,6 +591,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-op]").forEach((button) => {
 document.addEventListener("keydown", (event) => {
   if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
   const key = event.key.toLowerCase();
+  if(key==='f'&&!event.shiftKey&&!chooser.open&&!actionDialog.open){event.preventDefault();event.stopPropagation();openSearch();return;}
   if ((key === "k" && !event.shiftKey) || (key === "p" && event.shiftKey)) {
     event.preventDefault();
     event.stopPropagation();

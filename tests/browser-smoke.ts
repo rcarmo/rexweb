@@ -1,3 +1,4 @@
+import { checkReplay } from "./replay-browser-checks";
 import { checkRenderer } from "./renderer-browser-checks";
 import { chromium } from "../web/node_modules/playwright";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -15,11 +16,12 @@ const context=shared?browser.contexts()[0]:await browser.newContext({hasTouch:tr
 const page=await context.newPage();
 function assert(value:unknown,message:string):asserts value{if(!value)throw new Error(message)}
 const frames:{block:string;data:string}[]=[];
+const dimensions=new Map<string,{width:number;height:number}>();
 const errors:string[]=[];
 page.on("pageerror",e=>errors.push(String(e)));
 page.on("websocket",socket=>{
  const block=new URL(socket.url()).searchParams.get("block")??"";
- socket.on("framesent",e=>{try{const [kind,data]=JSON.parse(String(e.payload));if(kind==="stdin")frames.push({block,data})}catch{}});
+ socket.on("framesent",e=>{try{const [kind,data]=JSON.parse(String(e.payload));if(kind==="stdin")frames.push({block,data});else if(kind==="resize")dimensions.set(block,data)}catch{}});
 });
 async function helperCount(count=1) {
  assert(await page.locator(".mobile-keybar").count()===count,"duplicate/missing keyboard toolbar");
@@ -40,7 +42,59 @@ try {
  await page.getByRole("button",{name:"Split right",exact:true}).first().click();
  await page.waitForFunction(()=>document.querySelectorAll(".webterm-terminal.-connected").length===2);await helperCount();
  const panes=page.locator(".pane");
- await panes.nth(0).locator(".webterm-terminal").click();await typeMobile("LEFT-TOKEN");
+ // Search belongs to the focused pane, not every mounted renderer.
+ await panes.nth(0).locator(".webterm-terminal").click();
+ await typeMobile("printf 'SEARCH-%s\\n' LEFTONLY\r");
+ await panes.nth(1).locator(".webterm-terminal").click();
+ await typeMobile("printf 'SEARCH-%s\\n' RIGHTONLY\r");
+ await page.getByRole("button",{name:"Find in pane",exact:true}).click();
+ await page.getByRole("searchbox",{name:"Find in focused pane",exact:true}).fill("SEARCH-LEFTONLY");
+ await page.waitForTimeout(200);
+ assert(await page.locator("#search-results").textContent()==="0 matches","search leaked from the other pane");
+ await panes.nth(0).locator(".webterm-terminal").click();
+ await page.waitForFunction(()=>document.querySelector("#search-results")?.textContent==="1 / 1");
+ await page.getByRole("searchbox",{name:"Find in focused pane",exact:true}).focus();
+ await page.keyboard.press("Escape");
+ assert(await page.locator("#search-bar").isHidden(),"Escape did not close search");
+ await page.keyboard.press("Control+f");
+ assert(await page.locator("#search-text").evaluate(el=>document.activeElement===el),"Ctrl+F did not focus terminal search");
+ await page.keyboard.press("Escape");
+ // The singleton input moves between panes rather than leaving IME at (0,0).
+ await panes.nth(1).locator(".webterm-terminal").click();
+ const anchored=await page.locator("[data-mobile-keyboard-input]").boundingBox();
+ const targetBox=await panes.nth(1).locator(".webterm-terminal").boundingBox();
+ assert(anchored&&targetBox&&anchored.x>=targetBox.x&&anchored.x<targetBox.x+targetBox.width&&anchored.y>=targetBox.y&&anchored.y<targetBox.y+targetBox.height,"shared IME input is outside the focused pane");
+ // Native Copy stages only the current selection in the one shared input.
+ // Stub clipboard writers during selection so the test never replaces the
+ // operator's system clipboard; inspect the native copy event's payload.
+ await panes.nth(0).locator(".webterm-terminal").click();
+ const copyBlock=frames.find(f=>f.data.includes('LEFTONLY'))?.block;
+ const cells=copyBlock?dimensions.get(copyBlock):undefined;
+ const copyCanvas=panes.nth(0).locator('.webterm-terminal canvas').first();
+ const copyBox=await copyCanvas.boundingBox();
+ assert(cells&&copyBox,'missing terminal cell dimensions');
+ await copyCanvas.evaluate((canvas,point)=>{
+  const clipboard=navigator.clipboard;
+  const write=clipboard?.write,writeText=clipboard?.writeText;
+  try{
+   if(clipboard){clipboard.write=async()=>{};clipboard.writeText=async()=>{};}
+   canvas.dispatchEvent(new MouseEvent('click',{detail:2,clientX:point.x,clientY:point.y,bubbles:true,cancelable:true}));
+  }finally{if(clipboard){clipboard.write=write;clipboard.writeText=writeText;}}
+ },{x:copyBox.x+copyBox.width/cells.width*5.5,y:copyBox.y+copyBox.height/cells.height*1.5});
+ await panes.nth(0).locator('.webterm-terminal').dispatchEvent('contextmenu');
+ const copyInput=page.locator('[data-mobile-keyboard-input]');
+ const staged=await copyInput.inputValue();
+ assert(staged==='SEARCH-LEFTONLY','native Copy did not stage the terminal selection: '+JSON.stringify(staged));
+ const copied=await copyInput.evaluate(input=>{
+  const data=new DataTransfer();input.dispatchEvent(new ClipboardEvent('copy',{clipboardData:data,bubbles:true,cancelable:true}));return data.getData('text/plain');
+ });
+ assert(copied===staged&&await copyInput.inputValue()==='','native Copy lost or retained staged clipboard text');
+ await panes.nth(0).locator(".webterm-terminal").click();
+ const beforeInput=await copyInput.boundingBox();
+ await typeMobile("LEFT-TOKEN");
+ const afterInput=await copyInput.boundingBox();
+ assert(beforeInput&&afterInput&&afterInput.x>beforeInput.x,'IME did not follow horizontal cursor movement');
+
  const left=frames.find(f=>f.data==="LEFT-TOKEN")?.block;assert(left,"left pane received no input");
  await panes.nth(1).locator(".webterm-terminal").click();
  await page.locator('[data-modifier="ctrl"]').dispatchEvent("pointerdown");
@@ -127,6 +181,23 @@ try {
  });
  await page.waitForTimeout(100);
  assert(frames.slice(from).map(f=>f.data).join("")==="desktop-λ\ntext ","desktop paste failed");
+ // The renderer-owned desktop input uses the same native-copy contract.
+ await desktop.click();await page.keyboard.press('Control+c');
+ await page.keyboard.type("printf '\\033[2J\\033[HCOPY-%s\\n' DESKTOP");await page.keyboard.press('Enter');
+ await page.waitForTimeout(200);
+ const desktopCanvas=desktop.locator('canvas').first();const desktopBox=await desktopCanvas.boundingBox();
+ const desktopCells=[...dimensions.values()].at(-1);assert(desktopBox&&desktopCells,'missing desktop metrics');
+ await desktopCanvas.evaluate((canvas,point)=>{
+  const clipboard=navigator.clipboard;const write=clipboard?.write,writeText=clipboard?.writeText;
+  try{if(clipboard){clipboard.write=async()=>{};clipboard.writeText=async()=>{};}
+   canvas.dispatchEvent(new MouseEvent('click',{detail:2,clientX:point.x,clientY:point.y,bubbles:true,cancelable:true}));
+  }finally{if(clipboard){clipboard.write=write;clipboard.writeText=writeText;}}
+ },{x:desktopBox.x+desktopBox.width/desktopCells.width*4.5,y:desktopBox.y+desktopBox.height/desktopCells.height*0.5});
+ await desktop.dispatchEvent('contextmenu');
+ const desktopInput=desktop.locator('textarea').first();assert(await desktopInput.inputValue()==='COPY-DESKTOP','desktop native copy did not stage selection');
+ const desktopCopied=await desktopInput.evaluate(input=>{const data=new DataTransfer();input.dispatchEvent(new ClipboardEvent('copy',{clipboardData:data,bubbles:true,cancelable:true}));return data.getData('text/plain');});
+ assert(desktopCopied==='COPY-DESKTOP'&&await desktopInput.inputValue()==='','desktop native copy payload failed');
+ await checkReplay(page,`http://${address}`);
  await checkRenderer(page);
  assert(!errors.length,"browser exceptions: "+errors.join("; "));
  console.log("Browser smoke passed: mobile/desktop paste, bracketed paste, Unicode chunking, IME, focused-pane routing; one shared keyboard; no page exceptions.");

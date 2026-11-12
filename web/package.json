@@ -12,6 +12,6 @@
   },
   "type": "module",
   "dependencies": {
-    "ghostty-web": "github:rcarmo/ghostty-web#75d732e92f2ab83c1092db9b3a3ff0f8c64740da"
+    "ghostty-web": "github:rcarmo/ghostty-web#da088bb02755944d5429aaf22071712e0e23b227"
   }
 }

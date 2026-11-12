@@ -2,6 +2,9 @@
 
 ## Unreleased — Linux service
 
+- Added focused-pane search, cursor-anchored shared IME/native Copy, and cooperative replay-safe output parsing.
+- Updated the renderer to cached ABI-manifest-driven layouts and compatibility checks.
+
 - Added synchronized output and canvas recovery; fixed application wheel routing, URL parentheses and event-listener disposal.
 
 - Updated ghostty-web and its official Ghostty 1.4.1-dev core; rebuilt with Zig 0.17.0.
