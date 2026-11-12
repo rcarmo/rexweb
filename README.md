@@ -36,6 +36,11 @@ terminal selection. Text paste retains sanitisation and bracketed-paste handling
 Large output is parsed cooperatively so the page can remain interactive;
 reconnect offsets and input readiness wait for parser consumption.
 
+Selections are anchored in the client VT core and copied through its formatter.
+Alt-drag selects a rectangle; Shift/Alt selection gestures override application
+mouse reporting. Cell pitch and baseline resolve to physical pixels, including
+fractional DPR, and owning-window resize/DPR changes trigger a full repaint.
+
 ## Images and files
 
 Enable uploads explicitly with a web password:

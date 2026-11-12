@@ -2,6 +2,8 @@
 
 ## Unreleased — Linux service
 
+- Integrated core-anchored rectangular selection and physical-pixel font/grid metrics with fractional-DPR browser checks.
+
 - Added bounded case-sensitive, whole-word and linear-time regex search with asynchronous results and correct wrapped/Unicode cell mapping.
 
 - Added opt-in authenticated image/file uploads with confined atomic storage, limits, clipboard/drop and file-picker path paste.

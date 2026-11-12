@@ -124,6 +124,19 @@ export async function checkRenderer(page: Page) {
         bubbles: true, cancelable: true }));
     });
     await page.waitForFunction(url => (window as any).clickedURL === url, url);
+    await page.evaluate(()=>{
+      const term=(window as any).rendererTerm;term.reset();term.write('ABCDE\r\nFGHIJ\r\nKLMNO');term.selectRectangle(1,0,3,2);
+      if(term.getSelection()!=='BCD\nGHI\nLMN')throw new Error('core rectangular copy failed');
+    });
+    const cdp=await page.context().newCDPSession(page);
+    for(const ratio of [1,1.25,1.5,2]){
+      await cdp.send('Emulation.setDeviceMetricsOverride',{width:800,height:900,deviceScaleFactor:ratio,mobile:false});
+      await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await settle();
+      const grid=await page.evaluate(()=>{const term=(window as any).rendererTerm,canvas=term.renderer.getCanvas(),metrics=term.renderer.getMetrics();return {width:canvas.width,height:canvas.height,cols:term.cols,rows:term.rows,pitch:metrics.width*devicePixelRatio,line:metrics.height*devicePixelRatio};});
+      assert(Math.abs(grid.pitch-Math.round(grid.pitch))<1e-8&&Math.abs(grid.line-Math.round(grid.line))<1e-8,'fractional physical grid');
+      assert(grid.width===grid.cols*Math.round(grid.pitch)&&grid.height===grid.rows*Math.round(grid.line),'backing dimensions disagree with physical grid');
+    }
+    await cdp.send('Emulation.clearDeviceMetricsOverride');
     await page.evaluate(() => (window as any).rendererTerm.dispose());
     console.log("Renderer browser checks passed: held frames, echo guard, timeout, canvas recovery, SGR wheel and balanced-link activation.");
   } finally { await host.stop(true); }

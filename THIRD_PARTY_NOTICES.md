@@ -5,7 +5,7 @@ The project's MIT licence applies to its own code. The following components reta
 | Component | Version or source | Licence and retained notice |
 | --- | --- | --- |
 | webterm terminal component and styles | [fe3cc0340b5f4e86ec73ae5dcf311d78930134ec](https://github.com/rcarmo/webterm/tree/fe3cc0340b5f4e86ec73ae5dcf311d78930134ec) | MIT; [original notice](licenses/webterm-MIT.txt), copyright 2026 Rui Carmo |
-| ghostty-web JavaScript and WASM | [rcarmo fork, ae03ace6607fb70efa07706b4b92093272024a54](https://github.com/rcarmo/ghostty-web/tree/ae03ace6607fb70efa07706b4b92093272024a54) | [MIT](licenses/ghostty-web-MIT.txt), copyright 2025 Coder |
+| ghostty-web JavaScript and WASM | [rcarmo fork, cbeb80cd63a77d6105b329f979c4fe008cc9599b](https://github.com/rcarmo/ghostty-web/tree/cbeb80cd63a77d6105b329f979c4fe008cc9599b) | [MIT](licenses/ghostty-web-MIT.txt), copyright 2025 Coder |
 | RE2JS regular expression engine | [2.10.0](https://github.com/le0pard/re2js), linear-time advanced search | [MIT](licenses/re2js-MIT.txt) |
 | Ghostty VT core | Fork's submodule [c6174c88f42b48adb14857c9233b16f6947ab732](https://github.com/ghostty-org/ghostty/tree/c6174c88f42b48adb14857c9233b16f6947ab732) | [MIT](licenses/ghostty-MIT.txt), copyright 2024 Mitchell Hashimoto and Ghostty contributors |
 | Vendored libghostty-webgl | Version 0.0.1, author 0xBigBoss; included by ghostty-web | MIT as declared in the [retained upstream package metadata](licenses/ghostty-webgl-package.json); upstream has no separate licence file |
