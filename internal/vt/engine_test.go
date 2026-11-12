@@ -3,6 +3,10 @@ package vt
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"strings"
 	"testing"
@@ -164,5 +168,28 @@ func TestResetClearsMetadata(t *testing.T) {
 	}
 	if len(state.Info().Records) != 0 || len(state.Info().Prompts) != 0 {
 		t.Fatal("reset retained stale metadata")
+	}
+}
+
+func TestServerPNGDecoderAcknowledgesImages(t *testing.T) {
+	engine := testEngine(t)
+	state, err := engine.NewTerminal(context.Background(), 40, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer state.Close()
+	picture := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	picture.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, picture); err != nil {
+		t.Fatal(err)
+	}
+	command := "\x1b_Ga=T,f=100,i=1,s=1,v=1,c=1,r=1;" + base64.StdEncoding.EncodeToString(encoded.Bytes()) + "\x1b\\"
+	reply, err := state.Feed([]byte(command))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(reply, []byte("OK")) {
+		t.Fatalf("PNG acknowledgement: %q", reply)
 	}
 }

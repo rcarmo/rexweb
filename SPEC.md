@@ -56,3 +56,7 @@ Default supported shells receive OSC 133 PS1 hooks. Browser Previous/Next prompt
 ## Web image/file uploads
 
 `-uploads` plus password authentication enables one-file multipart POST uploads. The initiating session/pane must exist. The generated workspace name, detected MIME, size and absolute path are returned as JSON. Storage is rooted in a pinned directory descriptor, with no-follow/exclusive creation, complete-request validation and no-replace atomic commit. Partial files are removed. Browser clipboard/drop/file-picker integrations upload at most eight files sequentially and paste quoted paths without Enter into the initiating live pane. Limits are 16 MiB/file, four server requests and two minutes/request. No automatic retry or uploaded-file serving is provided.
+
+## Resolved image frames
+
+Client image snapshots use the shared render state's resolved rectangles/layers/crops and native content generations. Owned pixel caching is bounded to 64 MiB; borrowed WASM views are not retained. Terminal-owned animation scheduling cancels on reset/disposal/suspension, respects DEC holds and uses bounded deadlines. Canvas clips image layers to repainted rows to avoid stale retransmission and alpha accumulation. Server VT image storage is bounded to 16 MiB with a host PNG decoder limited to 8 MiB input/4096 dimensions/4 million pixels, and remains the source of protocol acknowledgements.

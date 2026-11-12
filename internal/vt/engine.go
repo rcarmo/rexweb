@@ -147,6 +147,7 @@ func (e *Engine) NewTerminal(ctx context.Context, cols, rows uint32) (_ *State, 
 		s.dirtyPWD = true
 		s.info.Revision++
 	}).Export("reset")
+	host.NewFunctionBuilder().WithFunc(s.decodePNG).Export("decode_png")
 	host.NewFunctionBuilder().WithFunc(s.writePTY).Export("write_pty")
 	host.NewFunctionBuilder().WithFunc(s.programStatus).Export("program_status")
 	host.NewFunctionBuilder().WithFunc(s.semanticPrompt).Export("semantic_prompt")
@@ -164,7 +165,7 @@ func (e *Engine) NewTerminal(ctx context.Context, cols, rows uint32) (_ *State, 
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"ghostty_type_json", "ghostty_wasm_alloc", "ghostty_wasm_free", "ghostty_wasm_alloc_opaque", "ghostty_wasm_free_opaque", "ghostty_terminal_new", "ghostty_terminal_free", "ghostty_terminal_set", "ghostty_terminal_get", "ghostty_terminal_vt_write", "ghostty_terminal_resize", "ghostty_formatter_terminal_new", "ghostty_formatter_set", "ghostty_formatter_format_buf", "ghostty_formatter_free"} {
+	for _, name := range []string{"ghostty_type_json", "ghostty_wasm_alloc", "ghostty_wasm_free", "ghostty_wasm_alloc_opaque", "ghostty_wasm_free_opaque", "ghostty_terminal_new", "ghostty_terminal_free", "ghostty_terminal_set", "ghostty_terminal_get", "ghostty_terminal_vt_write", "ghostty_terminal_resize", "ghostty_alloc", "ghostty_free", "ghostty_sys_set", "ghostty_formatter_terminal_new", "ghostty_formatter_set", "ghostty_formatter_format_buf", "ghostty_formatter_free"} {
 		fn := s.module.ExportedFunction(name)
 		if fn == nil {
 			return nil, fmt.Errorf("missing Ghostty export %s", name)
@@ -196,7 +197,7 @@ func (e *Engine) NewTerminal(ctx context.Context, cols, rows uint32) (_ *State, 
 	if err != nil || s.terminal == 0 {
 		return nil, errors.New("Ghostty did not create a terminal")
 	}
-	for name, value := range map[string]uint64{"SCROLLBACK_MAX_BYTES": 16 << 20, "SCROLLBACK_MAX_LINES": 2000, "KITTY_IMAGE_STORAGE_LIMIT": 0} {
+	for name, value := range map[string]uint64{"SCROLLBACK_MAX_BYTES": 16 << 20, "SCROLLBACK_MAX_LINES": 2000, "KITTY_IMAGE_STORAGE_LIMIT": 16 << 20} {
 		key, err := s.abi.value("GhosttyTerminalOption", name)
 		if err != nil {
 			return nil, err
@@ -228,6 +229,18 @@ func (e *Engine) NewTerminal(ctx context.Context, cols, rows uint32) (_ *State, 
 			return nil, err
 		}
 	}
+	png, err := s.shim.ExportedFunction("install_png").Call(ctx)
+	if err != nil || len(png) != 1 || uint32(png[0]) == ^uint32(0) {
+		return nil, errors.New("install server PNG decoder")
+	}
+	key, err := s.abi.value("GhosttySysOption", "DECODE_PNG")
+	if err != nil {
+		return nil, err
+	}
+	if err = s.result(ctx, "ghostty_sys_set", key, png[0]); err != nil {
+		return nil, err
+	}
+
 	return s, nil
 }
 

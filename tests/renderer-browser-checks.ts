@@ -137,6 +137,12 @@ export async function checkRenderer(page: Page) {
       assert(grid.width===grid.cols*Math.round(grid.pitch)&&grid.height===grid.rows*Math.round(grid.line),'backing dimensions disagree with physical grid');
     }
     await cdp.send('Emulation.clearDeviceMetricsOverride');
+    await page.evaluate(()=>{
+      const term=(window as any).rendererTerm;term.reset();term.write('\x1b[?25l\x1b_Ga=T,f=32,s=1,v=1,i=1,c=2,r=2,C=1,z=1;/wAA/w==\x1b\\');
+    });
+    await page.waitForFunction(()=>{const term=(window as any).rendererTerm;const pixel=term.renderer.getCanvas().getContext('2d').getImageData(3,3,1,1).data;return pixel[0]===255&&pixel[2]===0;});
+    await page.evaluate(()=>{const term=(window as any).rendererTerm;term.write('\x1b_Ga=f,f=32,i=1,s=1,v=1,z=100;AAD//w==\x1b\\\x1b_Ga=a,i=1,r=1,z=100\x1b\\\x1b_Ga=a,i=1,s=3\x1b\\');});
+    await page.waitForFunction(()=>{const term=(window as any).rendererTerm;const pixel=term.renderer.getCanvas().getContext('2d').getImageData(3,3,1,1).data;return pixel[2]===255&&pixel[0]===0;});
     await page.evaluate(() => (window as any).rendererTerm.dispose());
     console.log("Renderer browser checks passed: held frames, echo guard, timeout, canvas recovery, SGR wheel and balanced-link activation.");
   } finally { await host.stop(true); }

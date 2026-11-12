@@ -41,6 +41,13 @@ Alt-drag selects a rectangle; Shift/Alt selection gestures override application
 mouse reporting. Cell pitch and baseline resolve to physical pixels, including
 fractional DPR, and owning-window resize/DPR changes trigger a full repaint.
 
+Kitty graphics use core-resolved viewport rectangles, layers, source crops and
+content generations. The client keeps bounded owned pixel snapshots and schedules
+animation through core deadlines, with reset/suspend/DEC-hold cleanup. The server
+VT accepts images with a 16 MiB storage budget and a bounded Go PNG decoder
+(8 MiB encoded input, up to 4096 per dimension/4 million pixels), so it can supply
+correct protocol acknowledgements while remaining file/network independent.
+
 ## Images and files
 
 Enable uploads explicitly with a web password:
