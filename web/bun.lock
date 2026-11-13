@@ -5,7 +5,7 @@
     "": {
       "name": "webterm-frontend",
       "dependencies": {
-        "ghostty-web": "github:rcarmo/ghostty-web#133ea24e6c9156e7f25470872805736a6505d666",
+        "ghostty-web": "github:rcarmo/ghostty-web#65ea3ddbbd421c5a863c4de72866faf2ae73ad58",
       },
       "devDependencies": {
         "playwright": "1.61.0",
@@ -15,15 +15,19 @@
     },
   },
   "packages": {
+    "bidi-js": ["bidi-js@1.0.3", "", { "dependencies": { "require-from-string": "^2.0.2" } }, "sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw=="],
+
     "fsevents": ["fsevents@2.3.2", "", { "os": "darwin", "hasInstallScript": true }, "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="],
 
-    "ghostty-web": ["ghostty-web@github:rcarmo/ghostty-web#133ea24", { "dependencies": { "re2js": "2.10.0" } }, "rcarmo-ghostty-web-133ea24", "sha512-Y0zzWoR4+demtSnFoJiwYDz6srbkmMLTmaxBPWtZ5UivUjsXRnmARLM9eTHbnugdkkiWYDV8y4+yEIWhvNIB2w=="],
+    "ghostty-web": ["ghostty-web@github:rcarmo/ghostty-web#65ea3dd", { "dependencies": { "bidi-js": "1.0.3", "re2js": "2.10.0" } }, "rcarmo-ghostty-web-65ea3dd", "sha512-Jtq10ShLV8aaNDvOqGj7UvYSgPYDBibQD9iTBf0Vco+l7pOMEcKdONCM6s0jBaJZKPKTHvd9xbjnGqr9hDix/w=="],
 
     "playwright": ["playwright@1.61.0", "", { "dependencies": { "playwright-core": "1.61.0" }, "optionalDependencies": { "fsevents": "2.3.2" }, "bin": { "playwright": "cli.js" } }, "sha512-Z+7BeeqQPRRzklHsVFP4KTGIyMxKUmfeRA4WisM6G3/XW6nwGeX6fX9qYaDa+CiUqpOkb2f6X3nar05R3kSuJQ=="],
 
     "playwright-core": ["playwright-core@1.61.0", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-caX7TrY3Ml6egyDX0WUcTHDxodl/b51y5wJOdCEA36QviK/s2g081hvmGs8eaE3DWb6NYZQ6BjO/QkNRPenoPA=="],
 
     "re2js": ["re2js@2.10.0", "", {}, "sha512-/P6FNnLbHjXJMRF1dPoZoVTyHvFcuVhbDpzml9DPMlbeErYlZ18GueAaG9GhYhAm/9AN7i7Y6crmDrLX0DeJ4Q=="],
+
+    "require-from-string": ["require-from-string@2.0.2", "", {}, "sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

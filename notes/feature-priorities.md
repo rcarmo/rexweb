@@ -1,45 +1,46 @@
-# Terminal feature priorities
+# Terminal feature coverage
 
-Priorities for rexweb's remote, multi-pane browser workflow. The remaining order balances daily usefulness, integration effort and compatibility risk. Backlog entries are recommendations, not implemented capabilities.
+All ten requested areas are incorporated. The options and compatibility limits below describe what is shipped, rather than a future backlog.
 
-## Integrated
+| Feature | Incorporated behaviour | Limits |
+| --- | --- | --- |
+| Program status and prompts | Authoritative title/cwd, OSC 7501 state/progress badges, OSC 133 shell marks and focused Previous/Next prompt actions | Applications must emit reports; custom startup files may replace shell hooks. |
+| Export | Command-palette text, HTML and VT export from the server VT; bounded native Rex capture/blob pagination | Not a stable raw Ghostty snapshot format. HTML is sanitised and has a restrictive CSP. |
+| Physical-pixel metrics | DPR-aligned cell pitch, baseline and backing dimensions; resize/zoom remeasurement | Font appearance remains browser/font dependent. |
+| Advanced search | Case, whole-word and linear-time RE2JS regex modes; cancellable snapshots and wrapped/Unicode cell mapping | Bounded cells/text/matches; unsupported regex syntax is rejected and partial results are marked. |
+| Image/file paste | Authenticated picker, clipboard image and drop uploads; confined atomic storage and quoted path insertion without Enter | Explicit `-uploads`, password authentication, Origin validation, per-file/request/concurrency limits; no automatic retry. |
+| Core/rectangular selection | Core pins and formatter for linear copy; Alt-drag/programmatic rectangles, backward gestures and history | In BiDi mode rectangle columns are visual and copied cells are emitted in logical order per row. |
+| Server VT and capture | Pure-Go wazero execution of the embedded Ghostty core, shared compilation, authoritative replies, browser and native capture | Bounded memory/history/calls/captures; no external runtime process. |
+| Resolved/animated Kitty images | Resolved geometry, layers, crops and generations; bounded owned pixels and deadline-driven animation | Server PNG/image budgets and client memory bounds; timers stop on reset/disposal/suspension/held output. |
+| WebGPU and fallback | Opt-in GPU compositor, bounded texture storage and device-loss promotion to Canvas without discarding VT/selection | Canvas still rasterises glyphs; no GPU-side glyph layout/instancing. GPU display behaviour is unvalidated in this environment. |
+| RTL/BiDi | Opt-in row-local ordering with mapped cursor/IME, linear/rectangle selection, search highlights, links and mouse reports | Unicode 13 BiDi tables, LTR paragraph base; no Arabic joining/shaping or cross-row paragraph layout. Image-placeholder rows retain logical order. |
 
-- **ABI-manifest-driven bindings:** cache compound layouts and packed style flags from the loaded WASM; reject incompatible selectors, field representations and unsupported ABI shapes before binding handles.
-- **Focused-pane search:** Ctrl+F / ⌘F or the toolbar button; literal, ASCII-case-insensitive search over the active screen and loaded history, with counts, selected-match highlighting and older/newer navigation. Switching panes changes the target. No regex or whole-word matching yet.
-- **Shared cursor-anchored IME and native Copy:** one mobile input/keybar follows the active pane's cursor, including horizontal movement and viewport changes. Desktop and mobile Copy use the selected terminal text without background clipboard reads.
-- **Cooperative output parsing:** bounded chunks, time-budgeted work and an 8 MiB parser backlog limit. Parser completion controls resume offsets, input readiness and replacement-connection barriers. Reset/disposal discard unparsed work.
+## Enabling optional rendering
 
-The earlier correctness batch includes DEC 2026 presentation guards, canvas recovery, application wheel routing, listener snapshot dispatch, balanced URLs and constructor link-handler preservation.
+Use the command palette's **Try WebGPU compositor (reload)** and **Enable RTL/BiDi (reload)** actions, or URL parameters `renderer=webgpu` and `bidi=1`. Both are off by default. Reloads reconnect to the same server session; they do not restart its shells. GPU failure retains a Canvas path. The mobile keyboard/input helper remains document-wide and follows the focused pane.
 
-## Ranked remainder
+## Verification
 
-| Rank | Feature | Why this order | Effort | Main prerequisite or risk |
-| --- | --- | --- | --- | --- |
-| 1 | Program-status badges and prompt navigation | Helps monitor several sessions and navigate command boundaries. | Medium | Requires emitting applications or shell integration. Native Rex needs authoritative server-side status plumbing. |
-| 2 | Text, HTML and VT export | Useful for saving logs and browser-side restoration; the formatter is already in the core. | Medium for browser export | Export does not create server-side VT state, and its output is not the native Rex snapshot format. |
-| 3 | Physical-pixel font metrics and grid alignment | Improves zoom, fractional-DPR displays and box-drawing continuity without replacing the rendering architecture. | Medium | Compare fonts, DPRs, browser zoom and split sizes. Separate metrics changes from sprite/core changes. |
-| 4 | Advanced search modes | Extends the delivered literal search with case-sensitive, whole-word, regex and broader Unicode matching. | Medium | The core's native matching is literal with ASCII folding. Bound fallback work and regex cost; preserve match positions across wraps and output. |
-| 5 | Image and file paste | Valuable for remote tools accepting screenshots and attachments. | Medium–large | Needs an authenticated upload path, limits, safe names, workspace confinement and an explicit path-insertion policy. Never inject raw Ctrl-V ahead of ordinary text paste by default. |
-| 6 | Core-managed and rectangular selection | Adds Alt-drag block selection and may reduce JS/core disagreement. | Medium | Replaces working selection internals; verify touch gestures, wide cells, scrollback and logical copy order. |
-| 7 | Headless VT state and authoritative capture | Unlocks capture without a browser and stronger native reconnect semantics. | Large | Choose a server-side VT strategy compatible with the Go single binary. A browser addon or separate Bun service does not meet that requirement. |
-| 8 | Richer Kitty placements and animated images | Useful for image-heavy terminal workflows, but narrower value than search, input and replay improvements. | Medium–large | Validate image generations, timer disposal, resizing and per-pane memory use. |
-| 9 | Additional GPU backend and GPU-loss fallback | Potential gains for demanding multi-pane workloads. Existing opt-in WebGL provides a baseline. | Large | Measure bottlenecks first. Preserve a safe Canvas fallback and test resource cleanup/device loss. |
-| 10 | Bidirectional/RTL rendering | Valuable for mixed-direction languages, with significant integration and correctness demands. | Large | Reconcile Unicode table versions and visual/logical mapping for cursor, links, mouse reports and copied text. Prefer opt-in initially. |
+- ghostty-web: 532 passing tests and two existing historical scrollback skips; formatting, lint, type checking and rebuilt distributions pass.
+- rexweb: Go vet/unit tests, race detector, frontend checks, Linux sandbox/security/native/TLS smoke and official Rex CLI interoperability pass.
+- Chromium: full workspace/input/replay/upload checks, shared-helper checks, option reload/session preservation, fractional DPR, image animation and BiDi mapping/copy tests pass.
+- Firefox and desktop WebKit: Canvas recovery/DEC guards, wheel/link behaviour, rectangle copy, image animation and BiDi cursor/link/mouse/copy tests pass. Their GPU-unavailable Canvas paths pass. Fractional-DPR overrides remain Chromium-only.
+- GPU resource/cleanup tests and earlier software-device readback/device-loss checks passed, but visible GPU presentation is not validated here. This limitation is accepted, not counted as a display-test pass.
+- Release archives target Linux ARM64/AMD64. Extracted ARM64 runtime is tested locally; AMD64 runtime and physical iOS remain untested locally. Desktop WebKit does not establish iOS keyboard/touch parity.
 
-## Validation and maintenance
+## Maintenance contracts
 
-Firefox and WebKit clipboard, IME, scrolling and rendering cases are the next validation work alongside the backlog. Chromium checks alone do not establish Safari parity; desktop WebKit does not replace actual iOS touch and keyboard testing. Current browser checks cover pane-local search, shared-input geometry, native Copy payloads, paste/IME events, and disconnects during yielded replay parsing.
+Preserve parser-consumption replay offsets and parser-drain replacement barriers. Received bytes alone must not advance reconnect accounting or enable input. Preserve authentication, Host/Origin checks, fail-closed sandboxing, upload directory-FD confinement and paste sanitisation.
 
-For scheduling changes, retain the parser-completion barriers and test disconnects while processing a large replay, multiple noisy panes and disposal during queued work. For search and export, cover retained history, wraps, Unicode and alternate-screen transitions.
+Keep the current custom WASM build until the official prebuilt module has equivalent graphics support: the tested libghostty-vt 1.0.0 small build reports Kitty graphics disabled. Raw snapshot encoding is unstable and should not become a persisted or Rex wire format without explicit version/compatibility handling.
 
-Keep the current custom WASM build until the official prebuilt module has equivalent graphics support: the tested libghostty-vt 1.0.0 small build reports Kitty graphics disabled. Raw snapshot encoding is unstable and should not become a persisted or Rex wire format without explicit version/compatibility handling. Review PNG-decoder updates separately from fork merges.
+## Source provenance
 
-## Source candidates
+- Current renderer: [rcarmo/ghostty-web 65ea3dd](https://github.com/rcarmo/ghostty-web/tree/65ea3ddbbd421c5a863c4de72866faf2ae73ad58).
+- Official core: [Ghostty c6174c88](https://github.com/ghostty-org/ghostty/tree/c6174c88f42b48adb14857c9233b16f6947ab732), built with Zig 0.17.0.
+- ABI/search/scheduling ideas: [rundel/ghostterm](https://github.com/rundel/ghostterm/tree/0708fc36).
+- Status, image and BiDi starting points: [NimbleMarkets/ghostty-web](https://github.com/NimbleMarkets/ghostty-web/tree/64200917c61d64f0933b2034b0bbb186e3d2b914). The GPU compositor is a local implementation, not a port of its glyph-instancing pipeline.
+- Physical-pixel work: [Anomaly's grid alignment](https://github.com/anomalyco/ghostty-web/commit/0dcf95815d9200761bc543f27df09c9e4232032a).
+- Image-paste source survey: [Diego's addon](https://github.com/diegosouzapw/ghostty-web/commit/21483bde15626226194699b6bf8075d28decdf72).
 
-Port narrowly and retain the current ABI, renderer lifecycle and security checks. Fork histories contain older memory fixes and API replacements unsuitable for wholesale merging.
-
-- **Search extensions, serialization, selection and browser tests:** [rundel/ghostterm](https://github.com/rundel/ghostterm/tree/0708fc36). Relevant starting points: [serialization](https://github.com/rundel/ghostterm/commit/fb62c9655778c0f7c534e5232883e4ca1b950a66), [search](https://github.com/rundel/ghostterm/commit/9adbb0df918d50960963e78d8d461e832f3a45c8).
-- **Image paste:** [Diego's addon](https://github.com/diegosouzapw/ghostty-web/commit/21483bde15626226194699b6bf8075d28decdf72).
-- **Program status, GPU rendering, BiDi and Kitty images:** [NimbleMarkets/ghostty-web, nm-kitty-built](https://github.com/NimbleMarkets/ghostty-web/tree/64200917c61d64f0933b2034b0bbb186e3d2b914). Starting points: [program status](https://github.com/NimbleMarkets/ghostty-web/commit/0e226b40a2cb318495413ebe41d2eaa298101404), [resolved/animated placements](https://github.com/NimbleMarkets/ghostty-web/commit/5d75d88bc158ff486f1027d42b55f1469cd68072).
-- **Physical-pixel rendering:** [Anomaly's grid alignment work](https://github.com/anomalyco/ghostty-web/commit/0dcf95815d9200761bc543f27df09c9e4232032a), plus NimbleMarkets' newer font and box-drawing work.
-- **Scheduling ideas:** [ponzS/ghostty-web](https://github.com/ponzS/ghostty-web). Avoid importing its fork-specific Ghostty/WebShell ABI as part of a scheduling change.
+Licences and retained notices are listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

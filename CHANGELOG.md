@@ -2,6 +2,9 @@
 
 ## Unreleased — Linux service
 
+- Added opt-in WebGPU composition with Canvas fallback and retained VT/selection on device loss; GPU display validation remains unavailable locally.
+- Added opt-in row-local RTL/BiDi with logical copy, visual rectangles, and mapped cursor/IME, search, hyperlinks and mouse reporting.
+
 - Added resolved Kitty image geometry/layers, owned content-generation caching and bounded animation lifecycle support.
 - Added bounded server PNG decoding for authoritative image acknowledgements.
 

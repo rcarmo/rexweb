@@ -48,6 +48,30 @@ VT accepts images with a 16 MiB storage budget and a bounded Go PNG decoder
 (8 MiB encoded input, up to 4096 per dimension/4 million pixels), so it can supply
 correct protocol acknowledgements while remaining file/network independent.
 
+## Optional rendering modes
+
+The command palette offers **Try WebGPU compositor (reload)** and
+**Enable RTL/BiDi (reload)**. The equivalent URL options are
+`?renderer=webgpu` and `?bidi=1`; combine them with `&`. Reloading reconnects
+to the same server session and does not restart its shells. Both options are off
+by default and can be disabled through the palette.
+
+WebGPU requires a supported secure browser context (HTTPS or localhost). It uses
+Canvas glyph rasterization with GPU composition/presentation, not GPU-side text
+layout. Missing adapters, initialization errors, device loss and oversized GPU
+textures fall back to Canvas without discarding VT state or selection. Additional
+GPU texture storage is capped at 64 MiB per pane. GPU display behaviour has not
+been validated in this development environment.
+
+RTL/BiDi reorders cells within each row, keeping an LTR paragraph base and logical
+server/core storage. Cursor/IME anchors, links, search highlighting, selection
+and application mouse reports use the same coordinate map. Linear Copy preserves
+logical text; rectangular Copy takes a visual box and emits its cells in logical
+order per row. The mode uses Unicode 13 BiDi tables, does not add Arabic
+joining/shaping or cross-row paragraph layout, and leaves rows containing Kitty
+Unicode image placeholders in logical order. Leave it off for applications that
+perform their own BiDi layout.
+
 ## Images and files
 
 Enable uploads explicitly with a web password:
@@ -187,6 +211,8 @@ Use `systemctl edit rexweb` to replace ExecStart with your listener/isolation op
 ```sh
 make check                  # TypeScript, Go vet, unit tests
 make race                   # Go race detector
+make browser-smoke          # Chromium workspace/input/replay tests
+make cross-browser          # Firefox/WebKit renderer and BiDi checks (install browsers first)
 make smoke                  # Linux isolation, PTYs, reconnects, native protocol, auth and modes
 REX_REFERENCE_BIN=/path/to/rex make smoke  # Also test the official CLI
 make release                # Static Linux ARM64/AMD64 archives, SHA256SUMS, extracted-native smoke

@@ -1,6 +1,8 @@
 import { checkUploads } from "./upload-browser-checks";
 import { checkReplay } from "./replay-browser-checks";
 import { checkRenderer } from "./renderer-browser-checks";
+import { checkGPU } from "./gpu-browser-checks";
+import { checkBidi } from "./bidi-browser-checks";
 import { chromium } from "../web/node_modules/playwright";
 import { mkdtemp, rm } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -230,8 +232,28 @@ try {
  const afterPrompt=await promptCanvas.evaluate(canvas=>(canvas as HTMLCanvasElement).toDataURL());
  assert(afterPrompt!==beforePrompt,'prompt navigation did not move the visible terminal');
  assert(frames.length===beforeNavigation,'prompt navigation sent shell input');
+ // Rendering preferences reload/reconnect the same server session.
+ const sameSession=new URL(page.url()).searchParams.get('session');
+ await page.getByRole('button',{name:'Command palette',exact:true}).click();
+ await page.locator('#chooser-filter').fill('Enable RTL/BiDi (reload)');
+ await page.getByRole('button',{name:'Enable RTL/BiDi (reload)',exact:true}).click();
+ await page.waitForURL(url=>url.searchParams.get('bidi')==='1');
+ await page.waitForSelector('.webterm-terminal.-connected');await helperCount(0);
+ assert(new URL(page.url()).searchParams.get('session')===sameSession,'BiDi reload switched sessions');
+ await page.getByRole('button',{name:'Command palette',exact:true}).click();
+ await page.locator('#chooser-filter').fill('Try WebGPU compositor (reload)');
+ await page.getByRole('button',{name:'Try WebGPU compositor (reload)',exact:true}).click();
+ await page.waitForURL(url=>url.searchParams.get('renderer')==='webgpu');
+ await page.waitForSelector('.webterm-terminal.-connected');await helperCount(0);
+ assert(new URL(page.url()).searchParams.get('session')===sameSession,'renderer reload switched sessions');
+ assert(await page.locator('.pane-label').first().textContent()==='status-pane','reload lost server terminal metadata');
+ await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+ await page.reload();await page.waitForSelector('.webterm-terminal.-connected');await helperCount();
+ await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
  await checkReplay(page,`http://${address}`);
  await checkRenderer(page);
+ await checkGPU(page);
+ await checkBidi(page);
  await checkUploads(page);
  assert(!errors.length,"browser exceptions: "+errors.join("; "));
  console.log("Browser smoke passed: mobile/desktop paste, bracketed paste, Unicode chunking, IME, focused-pane routing; one shared keyboard; no page exceptions.");

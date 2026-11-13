@@ -38,6 +38,20 @@ const actionName = document.querySelector<HTMLInputElement>("#action-name")!;
 const appearance = matchMedia("(prefers-color-scheme: dark)");
 
 const panes = new Map<string, { element: HTMLElement; terminal?: WebTerminal }>();
+const rendererChoice = new URLSearchParams(location.search).get('renderer') === 'webgpu' ? 'webgpu' : 'canvas';
+const bidiEnabled = new URLSearchParams(location.search).get('bidi') === '1';
+function chooseBidi() {
+  const url = new URL(location.href);
+  if (bidiEnabled) url.searchParams.delete('bidi'); else url.searchParams.set('bidi', '1');
+  if (sessionId) url.searchParams.set('session', sessionId);
+  location.assign(url.href);
+}
+function chooseRenderer(renderer: 'canvas' | 'webgpu') {
+  const url = new URL(location.href);
+  if (renderer === 'canvas') url.searchParams.delete('renderer'); else url.searchParams.set('renderer', renderer);
+  if (sessionId) url.searchParams.set('session', sessionId);
+  location.assign(url.href);
+}
 let sessionId = new URLSearchParams(location.search).get("session") ?? "";
 let view: View | undefined;
 let activeWindow: WorkspaceWindow | undefined;
@@ -309,7 +323,7 @@ function mountPane(block: Block, rect: Rect, keep: Set<string>) {
     url.search = new URLSearchParams({ session: sessionId, block: id }).toString();
     const mounted = pane;
     const ownerSession=sessionId;
-    void WebTerminal.create(terminal, url.href, { autofocus: false, fontSize: 14, theme: terminalTheme(), uploadFile:file=>uploadToPane(file,ownerSession,id) }).then((instance) => {
+    void WebTerminal.create(terminal, url.href, { autofocus: false, fontSize: 14, renderer: rendererChoice, bidi: bidiEnabled, theme: terminalTheme(), uploadFile:file=>uploadToPane(file,ownerSession,id) }).then((instance) => {
       if (panes.get(id) === mounted) {
         mounted.terminal = instance;
         if (activeWindow?.focused_block_id === id) { focusTerminal(); runSearch(); }
@@ -551,6 +565,8 @@ function renderChooser() {
       { label: "New session", glyph: "plus", run: () => runCommand("create") },
       ...(view ? [
         { label: "New tab", glyph: "plus", run: () => runCommand("new-window") },
+        { label: rendererChoice === 'webgpu' ? 'Use Canvas renderer (reload)' : 'Try WebGPU compositor (reload)', glyph: 'terminal', run: () => chooseRenderer(rendererChoice === 'webgpu' ? 'canvas' : 'webgpu') },
+        { label: bidiEnabled ? 'Disable RTL/BiDi (reload)' : 'Enable RTL/BiDi (reload)', glyph: 'terminal', run: chooseBidi },
         ...(uploadsEnabled?[{label:'Upload files…',glyph:'plus',run:()=>runCommand('upload-file')}]:[]),
         { label: "Previous prompt", glyph: "terminal", run: () => runCommand("previous-prompt") },
         { label: "Next prompt", glyph: "terminal", run: () => runCommand("next-prompt") },

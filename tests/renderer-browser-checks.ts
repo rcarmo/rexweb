@@ -128,6 +128,7 @@ export async function checkRenderer(page: Page) {
       const term=(window as any).rendererTerm;term.reset();term.write('ABCDE\r\nFGHIJ\r\nKLMNO');term.selectRectangle(1,0,3,2);
       if(term.getSelection()!=='BCD\nGHI\nLMN')throw new Error('core rectangular copy failed');
     });
+    if (page.context().browser()?.browserType().name() === 'chromium') {
     const cdp=await page.context().newCDPSession(page);
     for(const ratio of [1,1.25,1.5,2]){
       await cdp.send('Emulation.setDeviceMetricsOverride',{width:800,height:900,deviceScaleFactor:ratio,mobile:false});
@@ -137,6 +138,8 @@ export async function checkRenderer(page: Page) {
       assert(grid.width===grid.cols*Math.round(grid.pitch)&&grid.height===grid.rows*Math.round(grid.line),'backing dimensions disagree with physical grid');
     }
     await cdp.send('Emulation.clearDeviceMetricsOverride');
+    await cdp.detach();
+    } else console.log('Fractional-DPR overrides: Chromium-only check; skipped for this browser.');
     await page.evaluate(()=>{
       const term=(window as any).rendererTerm;term.reset();term.write('\x1b[?25l\x1b_Ga=T,f=32,s=1,v=1,i=1,c=2,r=2,C=1,z=1;/wAA/w==\x1b\\');
     });

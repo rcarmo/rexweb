@@ -442,6 +442,8 @@ const THEMES: Record<string, ITheme> = {
 
 /** Configuration options passed via data attributes or window config */
 interface TerminalConfig {
+  renderer?: ITerminalOptions['renderer'];
+  bidi?: boolean;
   uploadFile?: (file:File)=>Promise<string>;
   autofocus?: boolean;
   fontFamily?: string;
@@ -648,6 +650,8 @@ class WebTerminal {
     const options: ITerminalOptions = {
       fontFamily,
       fontSize,
+      renderer: config.renderer,
+      bidi: config.bidi,
       scrollback: config.scrollback ?? defaultScrollback,
       cursorBlink: true,
       cursorStyle: "block",
@@ -661,7 +665,7 @@ class WebTerminal {
     terminal.loadAddon(fitAddon);
 
     // Open terminal (initializes rendering - WASM already loaded)
-    terminal.open(container);
+    await terminal.openAsync(container);
 
     const routeKey =
       container.dataset.sessionRouteKey ??
@@ -1155,7 +1159,7 @@ class WebTerminal {
     const canvas = renderer?.getCanvas();
     const rect = (canvas ?? this.element).getBoundingClientRect();
     const metrics = renderer?.getMetrics() ?? { width: 1, height: 16 };
-    const cursor = this.terminal.wasmTerm?.getCursor() ?? { x: 0, y: 0 };
+    const cursor = this.terminal.getVisualCursor();
     return {
       left: rect.left + cursor.x * metrics.width,
       top: rect.top + cursor.y * metrics.height,
