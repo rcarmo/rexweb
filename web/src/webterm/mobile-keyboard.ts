@@ -1,3 +1,5 @@
+import { inputFrame, visibleFrame } from "../viewport";
+
 /** One mobile input and toolbar per document, routed to the active terminal. */
 /** Detect if running on a mobile/touch device */
 export function isMobileDevice(): boolean {
@@ -177,6 +179,7 @@ class MobileKeyboard {
   private targets = new Set<Target>();
   private active?: Target;
   private composing = false;
+  private positionFrame?: number;
   private lastComposition?: { text: string; at: number };
   private lastPaste?: { text: string; source: string; at: number };
   private mobileInput: HTMLTextAreaElement | null = null;
@@ -200,17 +203,17 @@ class MobileKeyboard {
   constructor() {
     this.setupMobileKeyboard();
     this.setupMobileKeybar();
-    this.addTrackedListener(window, "resize", () => this.position());
-    this.addTrackedListener(document, "scroll", () => this.position(), {
+    this.addTrackedListener(window, "resize", () => this.schedulePosition());
+    this.addTrackedListener(document, "scroll", () => this.schedulePosition(), {
       capture: true,
       passive: true,
     });
     if (window.visualViewport) {
       this.addTrackedListener(window.visualViewport, "resize", () =>
-        this.position(),
+        this.schedulePosition(),
       );
       this.addTrackedListener(window.visualViewport, "scroll", () =>
-        this.position(),
+        this.schedulePosition(),
       );
     }
   }
@@ -253,6 +256,8 @@ class MobileKeyboard {
           if (this.mobileInput) this.mobileInput.value = "";
         }
         if (!this.targets.size) {
+          if (this.positionFrame !== undefined) window.cancelAnimationFrame(this.positionFrame);
+          this.positionFrame = undefined;
           for (const { target, type, handler, options } of this.boundHandlers)
             target.removeEventListener(type, handler, options);
           this.mobileInput?.remove();
@@ -262,6 +267,14 @@ class MobileKeyboard {
         }
       },
     };
+  }
+
+  private schedulePosition(): void {
+    // The workspace applies its viewport frame first; read the cursor afterwards.
+    this.positionFrame ??= window.requestAnimationFrame(() => {
+      this.positionFrame = undefined;
+      this.position();
+    });
   }
 
   private position(): void {
@@ -274,14 +287,11 @@ class MobileKeyboard {
       !Number.isFinite(anchor.height)
     )
       return;
-    const viewport = window.visualViewport;
-    const left = viewport?.offsetLeft ?? 0,
-      top = viewport?.offsetTop ?? 0;
-    const width = viewport?.width ?? window.innerWidth,
-      height = viewport?.height ?? window.innerHeight;
-    this.mobileInput.style.left = `${Math.max(left, Math.min(left + width - 1, anchor.left))}px`;
-    this.mobileInput.style.top = `${Math.max(top, Math.min(top + height - 1, anchor.top))}px`;
-    this.mobileInput.style.height = `${Math.max(1, Math.min(anchor.height, height))}px`;
+    const bounds = inputFrame(anchor, visibleFrame(window.innerWidth, window.innerHeight, window.visualViewport));
+    if (!bounds) return;
+    this.mobileInput.style.left = `${bounds.left}px`;
+    this.mobileInput.style.top = `${bounds.top}px`;
+    this.mobileInput.style.height = `${bounds.height}px`;
   }
 
   private prepareCopy(): void {
@@ -315,6 +325,7 @@ class MobileKeyboard {
     textarea.setAttribute("spellcheck", "false");
     textarea.setAttribute("inputmode", "text");
     textarea.setAttribute("enterkeyhint", "send");
+    textarea.setAttribute("wrap", "off");
     // iOS requires the element to be "visible" and interactive for keyboard
     // Use opacity near-zero but not zero, and keep it in the visible area
     textarea.dataset.mobileKeyboardInput = "";
@@ -333,6 +344,10 @@ class MobileKeyboard {
       outline: none;
       resize: none;
       font-size: 16px;
+      line-height: 16px;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
       caret-color: transparent;
       pointer-events: none;
     `;

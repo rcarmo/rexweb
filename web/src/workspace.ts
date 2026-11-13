@@ -1,5 +1,8 @@
 import { WebTerminal } from "./webterm/terminal";
+import { bindWorkspaceViewport } from "./viewport";
 import { previewSplit, type Layout, type Rect } from "./layout";
+
+bindWorkspaceViewport();
 
 interface Block {
   block_id: string;

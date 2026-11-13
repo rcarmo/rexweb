@@ -1,4 +1,5 @@
 import { checkUploads } from "./upload-browser-checks";
+import { checkViewport } from "./viewport-browser-checks";
 import { checkReplay } from "./replay-browser-checks";
 import { checkRenderer } from "./renderer-browser-checks";
 import { checkGPU } from "./gpu-browser-checks";
@@ -41,6 +42,7 @@ try {
  const cdp=await context.newCDPSession(page);await cdp.send("Emulation.setTouchEmulationEnabled",{enabled:true,maxTouchPoints:1});
  await page.goto(`http://${address}`);
  await page.waitForSelector(".webterm-terminal.-connected");await helperCount();
+ await checkViewport(page);
  await page.locator(".mobile-keybar").evaluate(el=>{el.dataset.testIdentity="original"});
  await page.getByRole("button",{name:"Split right",exact:true}).first().click();
  await page.waitForFunction(()=>document.querySelectorAll(".webterm-terminal.-connected").length===2);await helperCount();

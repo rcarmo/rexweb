@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Keep the workspace aligned with Safari visual-viewport keyboard/accessory panning and resizing without overriding pinch zoom.
+- Keep the entire shared input caret box inside the visible area and update its anchor after viewport layout changes.
+
 ## 0.1.0-preview.1 — 2026-11-13
 
 - Isolated authenticated upload browser tests with native HTTP-auth credentials, including WebSocket challenges.

@@ -31,8 +31,10 @@ and 10,000 matches. Partial counts are marked with '+'. Queries are limited
 to 1024 characters.
 
 One shared mobile keyboard/input follows the active pane's cursor, including
-horizontal movement, scrolling and resizing. Native Copy uses the current
-terminal selection. Text paste retains sanitisation and bracketed-paste handling.
+horizontal movement, scrolling and resizing. The workspace follows Safari's
+visual viewport when its keyboard or input accessory pans/resizes the view; the
+whole native caret box stays within the visible area. Pinch zoom is not treated
+as a keyboard resize. Native Copy uses the current terminal selection. Text paste retains sanitisation and bracketed-paste handling.
 Large output is parsed cooperatively so the page can remain interactive;
 reconnect offsets and input readiness wait for parser consumption.
 
