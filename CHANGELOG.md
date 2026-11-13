@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased — Linux service
+## 0.1.0-preview.1 — 2026-11-13
 
+- Isolated authenticated upload browser tests with native HTTP-auth credentials, including WebSocket challenges.
 - Added opt-in WebGPU composition with Canvas fallback and retained VT/selection on device loss; GPU display validation remains unavailable locally.
 - Added opt-in row-local RTL/BiDi with logical copy, visual rectangles, and mapped cursor/IME, search, hyperlinks and mouse reporting.
 

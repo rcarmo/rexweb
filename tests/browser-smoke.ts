@@ -254,7 +254,7 @@ try {
  await checkRenderer(page);
  await checkGPU(page);
  await checkBidi(page);
- await checkUploads(page);
+ await checkUploads();
  assert(!errors.length,"browser exceptions: "+errors.join("; "));
  console.log("Browser smoke passed: mobile/desktop paste, bracketed paste, Unicode chunking, IME, focused-pane routing; one shared keyboard; no page exceptions.");
 } finally {

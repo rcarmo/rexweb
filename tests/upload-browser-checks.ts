@@ -1,17 +1,24 @@
-import type {Page} from '../web/node_modules/playwright';
+import {chromium, type Browser} from '../web/node_modules/playwright';
 import {mkdtemp,writeFile,rm,readFile,stat} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 
-export async function checkUploads(page:Page){
+export async function checkUploads(){
  const scratch=await mkdtemp('/tmp/rexweb-upload-browser.');const password='uploads-test-password-0123456789';
  await writeFile(join(scratch,'password'),password,{mode:0o600});
  const process=Bun.spawn([resolve('bin/rexweb'),'-mode','web','-listen','127.0.0.1:0','-uploads','-password-file',join(scratch,'password'),'-session-socket',join(scratch,'run/session.sock'),'-workspace',join(scratch,'work')],{stdout:'pipe',stderr:'pipe'});
  let logs='';void(async()=>{for await(const chunk of process.stderr)logs+=new TextDecoder().decode(chunk)})();
  const authorization='Basic '+btoa('rexweb:'+password);const assert=(value:unknown,message:string)=>{if(!value)throw new Error(message)};
+ let browser:Browser|undefined;
  try{
+  // Use real browser HTTP-auth credentials, including WebSocket challenges.
+  // Keep fixture credentials out of the managed/shared browser context.
+  browser=await chromium.launch();
+  const context=await browser.newContext({httpCredentials:{username:'rexweb',password},hasTouch:true,viewport:{width:800,height:900}});
+  const page=await context.newPage();
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(String(error)));
   for(let i=0;i<100&&!logs.includes('Ready:');i++){assert(process.exitCode===null,'upload service exited: '+logs);await Bun.sleep(50)}
   const address=logs.match(/Web listener at (\S+)/)?.[1];assert(address,'upload service not ready');const origin='http://'+address;
-  await page.setExtraHTTPHeaders({Authorization:authorization});const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+  const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
   const input:string[]=[];page.on('websocket',socket=>{if(!socket.url().startsWith(origin.replace('http:','ws:')))return;socket.on('framesent',frame=>{try{const[kind,data]=JSON.parse(String(frame.payload));if(kind==='stdin')input.push(data)}catch{}})});
   await page.goto(origin);await page.waitForSelector('.webterm-terminal.-connected');await page.locator('.webterm-terminal').click();
   const firstResponse=page.waitForResponse(response=>response.url().includes('/api/upload?')&&response.request().method()==='POST');
@@ -30,6 +37,7 @@ export async function checkUploads(page:Page){
   const secondResponse=page.waitForResponse(response=>response.url().includes('/api/upload?')&&response.request().method()==='POST');
   await page.locator('#upload-file').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('second upload')});
   const second=await secondResponse;assert(second.ok(),'file picker upload failed');const secondResult=await second.json();assert((await readFile(secondResult.path)).toString()==='second upload','file upload changed bytes');
+  assert(!errors.length,'upload browser exceptions: '+errors.join('; '));
   console.log('Upload browser checks passed: clipboard image, file picker, confined names/permissions, auth/origin and path insertion without Enter.');
- }finally{await page.setExtraHTTPHeaders({});process.kill();await process.exited;await rm(scratch,{recursive:true,force:true})}
+ }finally{await browser?.close();process.kill();await process.exited;await rm(scratch,{recursive:true,force:true})}
 }
