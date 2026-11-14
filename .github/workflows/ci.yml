@@ -38,4 +38,5 @@ jobs:
       - run: make install-dev
       - run: make check race smoke
       - run: cd web && bunx playwright install --with-deps chromium
+      - run: make prefix-browser
       - run: make browser-smoke

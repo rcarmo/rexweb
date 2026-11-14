@@ -507,7 +507,7 @@ function getWasmPath(): string {
     return basePath + 'ghostty-vt.wasm';
   }
   // Fallback to common static paths
-  return '/static/js/ghostty-vt.wasm';
+  return new URL('static/js/ghostty-vt.wasm', document.baseURI).href;
 }
 
 /**

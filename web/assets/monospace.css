@@ -6,7 +6,7 @@ Uses a vendored FiraCode Nerd Font to keep local server self-contained.
 
 @font-face {
   font-family: "FiraCode Nerd Font";
-  src: url("/static/fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
+  src: url("fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -14,7 +14,7 @@ Uses a vendored FiraCode Nerd Font to keep local server self-contained.
 
 @font-face {
   font-family: "FiraMono Nerd Font";
-  src: url("/static/fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
+  src: url("fonts/FiraCodeNerdFont-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
