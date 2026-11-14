@@ -16,6 +16,13 @@ bin/rexweb
 
 Open <http://127.0.0.1:8080>. The binary works from any working directory. Browser disconnects leave shells running; reconnects replay up to 512 KiB per pane. Stopping or restarting the service ends shells and discards the in-memory layout and output. Workspace files remain on disk. Set `-workspace` to reuse a private directory outside the service account's home; the default is a fresh temporary directory whose path is logged at startup.
 
+Desktop keyboard input and composition use the terminal's real textarea, with
+its caret anchored to the focused pane. Same-origin browser tabs and iframes
+hand off a pane's single viewer connection. A paused view offers **Resume
+terminal in this tab**; this preserves the server session and never replays
+keyboard input. Coordination is limited to the same browser profile and origin;
+the server's native single-viewer guard still applies to other clients.
+
 ## Search and input
 
 Use **Ctrl+F / ⌘F** or the magnifying-glass button to search the focused pane.
@@ -214,6 +221,7 @@ Use `systemctl edit rexweb` to replace ExecStart with your listener/isolation op
 make check                  # TypeScript, Go vet, unit tests
 make race                   # Go race detector
 make browser-smoke          # Chromium workspace/input/replay tests
+make input-browser          # Native desktop IME and tab/iframe viewer handoff
 make cross-browser          # Firefox/WebKit renderer and BiDi checks (install browsers first)
 make smoke                  # Linux isolation, PTYs, reconnects, native protocol, auth and modes
 REX_REFERENCE_BIN=/path/to/rex make smoke  # Also test the official CLI

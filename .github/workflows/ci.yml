@@ -39,3 +39,4 @@ jobs:
       - run: make check race smoke
       - run: cd web && bunx playwright install --with-deps chromium
       - run: make browser-smoke
+      - run: make input-browser
