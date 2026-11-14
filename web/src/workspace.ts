@@ -313,12 +313,16 @@ function mountPane(block: Block, rect: Rect, keep: Set<string>) {
     header.append(title, actions);
     const terminal = document.createElement("div");
     terminal.className = "webterm-terminal";
-    element.append(header, terminal);
+    const viewport = document.createElement("div");
+    viewport.className = "terminal-viewport";
+    viewport.append(terminal);
+    element.append(header, viewport);
     workspace.append(element);
     pane = { element };
     panes.set(id, pane);
     element.addEventListener("pointerdown", (event) => {
       if ((event.target as Element).closest("button")) return;
+      if (event.pointerType === "mouse") panes.get(id)?.terminal?.focus(true);
       if (activeWindow?.focused_block_id !== id) void act("focus-block", { block: id });
     });
     const url = new URL("/api/terminal", location.href);
@@ -670,6 +674,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-op]").forEach((button) => {
   button.addEventListener("click", () => runCommand(button.dataset.op!));
 });
 document.addEventListener("keydown", (event) => {
+  if (event.isComposing || event.keyCode === 229) return;
   if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
   const key = event.key.toLowerCase();
   if(key==='f'&&!event.shiftKey&&!chooser.open&&!actionDialog.open){event.preventDefault();event.stopPropagation();openSearch();return;}

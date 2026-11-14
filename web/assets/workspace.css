@@ -98,7 +98,10 @@ button:disabled:hover { background: transparent; }
 .pane:hover .pane-actions .icon-button, .pane:focus-within .pane-actions .icon-button { opacity: 1; }
 .pane:has(.-disconnected) .pane-label::after { content: " · reconnecting"; color: var(--muted); font-weight: 400; }
 .pane:has(.-exited) .pane-label::after { content: " · exited"; color: var(--muted); font-weight: 400; }
-.webterm-terminal { padding: 5px 12px 10px; }
+.terminal-viewport { min-width: 0; min-height: 0; padding: 5px 12px 10px; }
+.webterm-terminal { padding: 0; }
+.terminal-resume { position: absolute; z-index: 4; bottom: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 16px); white-space: normal; padding: 9px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--raised); }
+.terminal-resume[hidden] { display: none; }
 .divider { position: absolute; z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; background: transparent; }
 body.resizing-columns, body.resizing-columns *, body.resizing-rows, body.resizing-rows * { user-select: none; -webkit-user-select: none; }
 body.resizing-columns, body.resizing-columns * { cursor: col-resize !important; }

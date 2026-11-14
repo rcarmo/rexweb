@@ -8,6 +8,7 @@
 
 import { bindMobileKeyboard, isMobileDevice, type KeyboardBinding } from "./mobile-keyboard";
 import { Terminal, FitAddon, Ghostty, SearchAddon, type SearchResults, type SearchOptions, type ITerminalOptions, type ITheme } from "ghostty-web";
+import { TerminalViewer } from "../viewer";
 
 /** Maximum queued messages before oldest are dropped */
 const MAX_MESSAGE_QUEUE_SIZE = 1000;
@@ -554,6 +555,10 @@ class WebTerminal {
   private uploadHandler?: (file:File)=>Promise<string>;
   private searchListener?: (result: SearchResults) => void;
   private mobilePositionFrame?: number;
+  private composing = false;
+  private copyStaged = false;
+  private viewer?: TerminalViewer;
+  private resumeButton?: HTMLButtonElement;
   private ready = false;
   private exited = false;
   private baseTitle: string;
@@ -665,6 +670,12 @@ class WebTerminal {
     terminal.loadAddon(fitAddon);
 
     // Open terminal (initializes rendering - WASM already loaded)
+    // openAsync calls focus() internally, including a delayed second focus in
+    // the pinned fork. Suppress that container focus before it can steal focus
+    // from a pane selected by the workspace (or from a host/search dialog).
+    terminal.focus = () => {
+      if (config.autofocus ?? true) terminal.textarea?.focus({ preventScroll: true });
+    };
     await terminal.openAsync(container);
 
     const routeKey =
@@ -724,7 +735,8 @@ class WebTerminal {
       this.searchListener?.(result),
     );
     this.terminal.onWriteError(() => this.failStream());
-    this.terminal.onWriteParsed(() => this.positionMobileInput());
+    this.terminal.onWriteParsed(() => this.positionInput());
+    this.terminal.onScroll(() => this.positionInput());
 
     // Handle terminal input
     this.terminal.onData((data) => {
@@ -747,7 +759,7 @@ class WebTerminal {
       if (this.isValidSize(size.cols, size.rows)) {
         this.lastValidSize = { cols: size.cols, rows: size.rows };
         this.send(["resize", { width: size.cols, height: size.rows, cell_width:Math.round(this.terminal.renderer?.charWidth??0),cell_height:Math.round(this.terminal.renderer?.charHeight??0) }]);
-        this.positionMobileInput();
+        this.positionInput();
       }
     });
 
@@ -767,6 +779,51 @@ class WebTerminal {
         () => this.terminal.copySelection(),
         files=>this.uploadFiles(files),
       );
+    // Ghostty's focus() targets its contenteditable container, but its native
+    // beforeinput/composition listeners belong to the textarea. Use one actual
+    // editing surface so IMEs, dictation and insertText follow the same path.
+    this.element.contentEditable = "false";
+    this.element.tabIndex = -1;
+    this.element.setAttribute("role", "group");
+    this.element.setAttribute("aria-label", "Terminal");
+    this.element.removeAttribute("aria-multiline");
+    if (!this.mobileKeyboard && this.terminal.textarea) {
+      const input = this.terminal.textarea;
+      Object.assign(input.style, {
+        clipPath: "none", height: "20px", padding: "0", margin: "0",
+        border: "0", outline: "none", fontFamily: this.fontFamily,
+        fontSize: `${this.fontSize}px`, caretColor: "transparent",
+      });
+      this.addTrackedListener(input, "focus", () => this.updateInputPosition());
+      this.addTrackedListener(input, "compositionstart", () => {
+        this.updateInputPosition();
+        this.composing = true;
+        this.copyStaged = false;
+      });
+      this.addTrackedListener(input, "compositionupdate", ((event: CompositionEvent) => {
+        this.terminal.setPreedit(event.data);
+      }) as EventListener);
+      this.addTrackedListener(input, "compositionend", () => {
+        this.composing = false;
+        this.terminal.clearPreedit();
+        this.positionInput();
+      });
+      this.addTrackedListener(input, "input", () => {
+        if (!this.composing) input.value = "";
+      });
+      this.addTrackedListener(input, "blur", () => {
+        if (!this.composing) { input.value = ""; this.terminal.clearPreedit(); }
+      });
+      this.addTrackedListener(this.element, "mousedown", (event) => {
+        event.preventDefault();
+        this.focus(true);
+      });
+      // SelectionManager temporarily moves the same textarea for native copy.
+      // Restore the caret box after its document-level click/copy cleanup.
+      this.addTrackedListener(this.element, "click", () => this.positionInput());
+      this.addTrackedListener(document, "scroll", () => this.positionInput(), { capture: true, passive: true });
+      this.updateInputPosition();
+    }
     this.setupTouchSelection();
     this.addTrackedListener(this.element,'paste',((event:ClipboardEvent)=>{
       const files=Array.from(event.clipboardData?.files??[]);
@@ -788,21 +845,32 @@ class WebTerminal {
         event.preventDefault();
         event.stopPropagation();
         event.clipboardData.setData("text/plain", text);
-        if (this.terminal.textarea) this.terminal.textarea.value = "";
+        if (this.terminal.textarea && !this.composing) this.terminal.textarea.value = "";
+        this.copyStaged = false;
+        this.positionInput();
       }
     }) as EventListener);
     this.addTrackedListener(
       this.element,
       "keydown",
       ((event: KeyboardEvent) => {
+        // Let the browser handle candidate selection. In particular, the Enter
+        // accepting a candidate must not also execute the shell command.
+        if (this.composing || event.isComposing || event.keyCode === 229) {
+          event.stopPropagation();
+          return;
+        }
         if (
+          this.copyStaged &&
           !(
             (event.ctrlKey || event.metaKey) &&
             event.key.toLowerCase() === "c"
           ) &&
           this.terminal.textarea
-        )
+        ) {
           this.terminal.textarea.value = "";
+          this.copyStaged = false;
+        }
       }) as EventListener,
       { capture: true },
     );
@@ -810,6 +878,17 @@ class WebTerminal {
     // Start periodic resource cleanup
     this.startResourceCleanup();
 
+    // A browser tab/iframe hands off its viewer instead of fighting the
+    // server's single-connection guard. No PTY or server layout is recreated.
+    const viewerURL = new URL(this.wsUrl, location.href);
+    const key = JSON.stringify([viewerURL.pathname, ...['host', 'session', 'block'].map(k => viewerURL.searchParams.get(k) || '')]);
+    this.viewer = new TerminalViewer(key, () => {
+      if (this.resumeButton) {
+        this.resumeButton.disabled = true;
+        this.resumeButton.textContent = 'Connecting…';
+      }
+      this.reconnectAttempts = 0; this.connect();
+    }, () => this.pauseViewer());
     // Connect WebSocket
     this.connect();
     if (document.hasFocus()) {
@@ -817,13 +896,9 @@ class WebTerminal {
     }
 
     const restoreFocus = () => {
-      if (!this.autofocus) return;
+      if (!this.autofocus && !this.element.contains(document.activeElement)) return;
       this.clearBellState();
-      if (isMobileDevice()) {
-        this.mobileKeyboard?.focus();
-      } else {
-        this.terminal.focus();
-      }
+      this.focus();
     };
 
     // Focus terminal when returning to the tab
@@ -1024,6 +1099,7 @@ class WebTerminal {
   connect(): void {
     if (
       this.disposed ||
+      (this.viewer && !this.viewer.active) ||
       this.exited ||
       this.socket?.readyState === WebSocket.OPEN ||
       this.socket?.readyState === WebSocket.CONNECTING
@@ -1039,6 +1115,7 @@ class WebTerminal {
       if (
         epoch === this.streamEpoch &&
         !this.disposed &&
+        (!this.viewer || this.viewer.active) &&
         !this.exited &&
         this.socket?.readyState !== WebSocket.OPEN &&
         this.socket?.readyState !== WebSocket.CONNECTING
@@ -1048,6 +1125,7 @@ class WebTerminal {
   }
 
   private openSocket(): void {
+    if (this.viewer && !this.viewer.active) return;
     const gen = ++this.socketGeneration;
     const url = new URL(this.wsUrl, window.location.href);
     if (this.streamOffset !== undefined) {
@@ -1055,9 +1133,10 @@ class WebTerminal {
     }
     this.socket = new WebSocket(url);
     this.socket.binaryType = "arraybuffer";
+    const socket = this.socket;
 
     this.socket.addEventListener("close", () => {
-      if (gen !== this.socketGeneration) return;
+      if (gen !== this.socketGeneration || this.socket !== socket) return;
       this.ready = false;
       this.pendingStdin = "";
       this.messageQueue.length = 0;
@@ -1075,6 +1154,25 @@ class WebTerminal {
       if (gen !== this.socketGeneration) return;
       this.handleMessage(event.data, gen);
     });
+  }
+
+  private pauseViewer(): void {
+    this.flushStdin();
+    this.ready = false; this.connectPending = false;
+    this.messageQueue.length = 0; this.stopHeartbeatWatchdog();
+    this.socket?.close(); this.socket = null;
+    this.element.classList.remove('-connected', '-disconnected');
+    this.element.classList.add('-paused');
+    if (!this.resumeButton) {
+      const button = document.createElement('button');
+      button.className = 'terminal-resume';
+      button.textContent = 'Active in another tab · Resume here';
+      button.setAttribute('aria-label', 'Resume terminal in this tab');
+      this.addTrackedListener(button, 'click', () => { this.viewer?.resume(); this.focus(); });
+      this.element.append(button); this.resumeButton = button;
+    }
+    this.resumeButton.disabled = false;
+    this.resumeButton.textContent = 'Active in another tab · Resume here';
   }
 
   /** History and live bytes share the same cursor. Only live output may generate input. */
@@ -1123,7 +1221,8 @@ class WebTerminal {
           this.ready = true;
           this.reconnectAttempts = 0;
           this.element.classList.add("-connected");
-          this.element.classList.remove("-disconnected");
+          this.element.classList.remove("-disconnected", "-paused");
+          this.resumeButton?.remove(); this.resumeButton = undefined;
           if (!document.hidden) this.startHeartbeatWatchdog();
           const { cols, rows } = this.terminal;
           if (this.isValidSize(cols, rows))
@@ -1167,12 +1266,30 @@ class WebTerminal {
     };
   }
 
-  private positionMobileInput(): void {
-    if (!this.mobileKeyboard || this.mobilePositionFrame !== undefined) return;
+  private positionInput(): void {
+    if (this.mobilePositionFrame !== undefined) return;
     this.mobilePositionFrame = requestAnimationFrame(() => {
       this.mobilePositionFrame = undefined;
-      if (!this.disposed) this.mobileKeyboard?.updatePosition();
+      if (!this.disposed) this.updateInputPosition();
     });
+  }
+
+  private updateInputPosition(): void {
+    if (this.mobileKeyboard) { this.mobileKeyboard.updatePosition(); return; }
+    const input = this.terminal.textarea;
+    if (!input || this.composing || this.disposed) return;
+    const anchor = this.cursorAnchor();
+    const rect = this.element.getBoundingClientRect();
+    // The textarea is positioned in the same coordinate system as its canvas,
+    // including inside an iframe or a split. No viewport-fixed fake input.
+    input.style.position = "absolute";
+    input.style.width = "1px";
+    input.style.zIndex = "0";
+    input.style.pointerEvents = "none";
+    input.style.left = `${Math.max(0, Math.min(rect.width - 2, anchor.left - rect.left))}px`;
+    input.style.top = `${Math.max(0, Math.min(rect.height - anchor.height, anchor.top - rect.top))}px`;
+    input.style.height = `${anchor.height}px`;
+    input.style.lineHeight = `${anchor.height}px`;
   }
 
   private prepareNativeCopy(): void {
@@ -1180,6 +1297,7 @@ class WebTerminal {
     const input = this.terminal.textarea;
     if (!text || !input) return;
     input.value = text;
+    this.copyStaged = true;
     input.focus({ preventScroll: true });
     input.select();
   }
@@ -1376,6 +1494,7 @@ class WebTerminal {
 
   /** Clean up resources */
   dispose(): void {
+    this.viewer?.dispose(); this.resumeButton?.remove();
     this.disposed = true;
     this.streamEpoch++;
     this.searchListener = undefined;
@@ -1413,9 +1532,14 @@ class WebTerminal {
   }
 
   /** Restore focus after workspace navigation or a dialog closes. */
-  focus(): void {
-    if (isMobileDevice()) this.mobileKeyboard?.focus();
-    else this.terminal.focus();
+  focus(activate = false): void {
+    if (this.disposed) return;
+    if (this.mobileKeyboard) this.mobileKeyboard.focus();
+    else {
+      this.updateInputPosition();
+      this.terminal.textarea?.focus({ preventScroll: true });
+    }
+    if (activate) this.viewer?.resume();
   }
 
   /** Set terminal theme dynamically (accesses private renderer) */
