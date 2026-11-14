@@ -153,6 +153,22 @@ In Rex.app, add `http://127.0.0.1:7297` as a remote host when native TCP is enab
 
 One live viewer per pane is supported. Close a browser pane/tab viewer before attaching that pane from Rex, or use another pane. Native resume, floating panes, Lua, command-layout options, the full automation/discovery API and multi-user login are unsupported. Unsupported methods fail explicitly. See [SPEC.md](SPEC.md).
 
+## Reverse proxy URL prefixes
+
+To serve the web client below a path, configure the same prefix on the service
+and preserve it when proxying HTTP requests and WebSocket upgrades:
+
+```sh
+rexweb -base-path /terminal/ -public-url https://terminal.example
+```
+
+Open `https://terminal.example/terminal/`. The prefix must begin and end with
+`/`; it defaults to `/`. CSS, fonts, JavaScript, WASM, API requests and terminal
+WebSockets resolve below that prefix. Existing authentication and Host/Origin
+checks still apply. This option does not change the frame policy or native Rex
+listener paths. A trusted embedding gateway can set its own frame policy after
+authenticating the request.
+
 ## Remote access
 
 Prefer SSH forwarding. It adds authentication and encryption without exposing a shell service to the network:

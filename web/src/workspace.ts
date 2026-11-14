@@ -4,6 +4,8 @@ import { previewSplit, type Layout, type Rect } from "./layout";
 
 bindWorkspaceViewport();
 
+const endpoint = (path: string) => new URL(path.replace(/^\//, ""), document.baseURI).href;
+
 interface Block {
   block_id: string;
   label: string;
@@ -141,7 +143,7 @@ async function exportFocused(format: 'text'|'html'|'vt') {
   if(!block)return;
   try {
     const query=new URLSearchParams({session:sessionId,block,format,trim:'true'});
-    const response=await fetch('/api/capture?'+query);
+    const response=await fetch(endpoint('/api/capture?'+query));
     if(!response.ok){const error=await response.json();throw new Error(error.message??'Capture failed');}
     const url=URL.createObjectURL(await response.blob());
     const link=document.createElement('a');link.href=url;link.download=`terminal.${format==='text'?'txt':format}`;link.click();
@@ -151,11 +153,11 @@ async function exportFocused(format: 'text'|'html'|'vt') {
 
 let uploadsEnabled=false;
 const uploadInput=document.querySelector<HTMLInputElement>('#upload-file')!;
-void fetch('/api/capabilities').then(response=>response.json()).then(value=>{uploadsEnabled=!!value.uploads;});
+void fetch(endpoint('/api/capabilities')).then(response=>response.json()).then(value=>{uploadsEnabled=!!value.uploads;});
 async function uploadToPane(file:File,session:string,block:string):Promise<string> {
   if(!uploadsEnabled)throw new Error('Uploads are disabled; configure -uploads with web password authentication.');
   const body=new FormData();body.append('file',file,file.name);
-  const response=await fetch('/api/upload?'+new URLSearchParams({session,block}),{method:'POST',body});
+  const response=await fetch(endpoint('/api/upload?'+new URLSearchParams({session,block})),{method:'POST',body});
   const result=await response.json();if(!response.ok)throw new Error(result.message??'Upload failed');
   status.textContent=`Uploaded ${result.display_name||result.name}`;return result.path;
 }
@@ -196,7 +198,7 @@ function focusTerminal() {
 }
 
 async function api<T>(path: string, body?: Record<string, unknown>): Promise<T> {
-  const response = await fetch(path, body && {
+  const response = await fetch(endpoint(path), body && {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -321,7 +323,7 @@ function mountPane(block: Block, rect: Rect, keep: Set<string>) {
       if ((event.target as Element).closest("button")) return;
       if (activeWindow?.focused_block_id !== id) void act("focus-block", { block: id });
     });
-    const url = new URL("/api/terminal", location.href);
+    const url = new URL("api/terminal", document.baseURI);
     url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
     url.search = new URLSearchParams({ session: sessionId, block: id }).toString();
     const mounted = pane;

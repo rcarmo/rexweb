@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -16,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -32,6 +34,7 @@ var commit = "unknown"
 type options struct {
 	mode, listen, rexListen, socket, shell, workdir, webdir, publicURL, passwordFile, cert, key, isolation string
 	anonymous, insecure, uploads                                                                           bool
+	basePath                                                                                               string
 }
 
 func main() {
@@ -63,6 +66,7 @@ func main() {
 	flag.StringVar(&o.isolation, "isolation", "sandbox", "sandbox (Linux namespaces) or host (explicit full account access)")
 	flag.StringVar(&o.webdir, "web-dir", "", "optional development asset directory (default: embedded frontend)")
 	flag.StringVar(&o.publicURL, "public-url", "", "exact external web origin, required for non-loopback web listeners")
+	flag.StringVar(&o.basePath, "base-path", "/", "web URL prefix, with leading and trailing slashes")
 	flag.StringVar(&o.passwordFile, "password-file", "", "private file containing web HTTP Basic password (username: rexweb)")
 	flag.StringVar(&o.cert, "tls-cert", "", "PEM TLS certificate for TCP listeners")
 	flag.StringVar(&o.key, "tls-key", "", "PEM TLS key for TCP listeners")
@@ -86,6 +90,9 @@ func main() {
 }
 
 func (o options) validate() error {
+	if o.basePath != "" && !regexp.MustCompile(`^/(?:[A-Za-z0-9_-]+/)*$`).MatchString(o.basePath) {
+		return errors.New("-base-path must be a URL prefix with leading and trailing slashes")
+	}
 	if runtime.GOOS != "linux" {
 		return errors.New("this service requires Linux")
 	}
@@ -162,6 +169,10 @@ func readPassword(path string) (string, error) {
 }
 
 func webHandler(o options, store *workspace.Store, assets fs.FS, password string) http.Handler {
+	basePath := o.basePath
+	if basePath == "" {
+		basePath = "/"
+	}
 	mux := http.NewServeMux()
 	api := store.Handler()
 	mux.Handle("GET /api/sessions", api)
@@ -172,7 +183,20 @@ func webHandler(o options, store *workspace.Store, assets fs.FS, password string
 	mux.Handle("GET /api/metadata", api)
 	mux.Handle("POST /api/action", requireOrigin(api))
 	mux.Handle("GET /api/terminal", requireOrigin(api))
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		index, err := fs.ReadFile(assets, "index.html")
+		if err != nil {
+			http.Error(w, "frontend unavailable", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(bytes.ReplaceAll(index, []byte("__REXWEB_BASE_PATH__"), []byte(basePath)))
+	})
 	mux.Handle("GET /", http.FileServer(http.FS(assets)))
+	var handler http.Handler = mux
+	if basePath != "/" {
+		handler = http.StripPrefix(strings.TrimSuffix(basePath, "/"), mux)
+	}
 	expected := sha256.Sum256([]byte(password))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -208,7 +232,15 @@ func webHandler(o options, store *workspace.Store, assets fs.FS, password string
 				return
 			}
 		}
-		mux.ServeHTTP(w, r)
+		if basePath != "/" && !strings.HasPrefix(r.URL.Path, basePath) {
+			http.NotFound(w, r)
+			return
+		}
+		// The file server can also serve index.html directly.
+		if r.URL.Path == basePath+"index.html" {
+			r.URL.Path = basePath
+		}
+		handler.ServeHTTP(w, r)
 	})
 }
 
