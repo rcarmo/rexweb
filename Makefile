@@ -1,4 +1,4 @@
-.PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke prefix-browser cross-browser vt-callbacks release clean
+.PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke prefix-browser input-browser cross-browser vt-callbacks release clean
 .DEFAULT_GOAL := build
 
 VERSION ?= $(shell cat VERSION)
@@ -40,6 +40,9 @@ browser-smoke: build-go
 
 prefix-browser: build-go
 	bun tests/prefix-browser.ts
+
+input-browser: build-go
+	bun tests/input-browser.ts
 
 cross-browser: build-web
 	bun tests/cross-browser-checks.ts

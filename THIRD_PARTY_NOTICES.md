@@ -22,7 +22,7 @@ The project's MIT licence applies to its own code. The following components reta
 | Gorilla WebSocket | [v1.5.3](https://github.com/gorilla/websocket/tree/v1.5.3) | [BSD-2-Clause](licenses/gorilla-websocket-BSD-2-Clause.txt), copyright 2013 The Gorilla WebSocket Authors |
 | FiraCode Nerd Font | Fira Code 6.002, patched with Nerd Fonts 3.4.0, as recorded in the font's name table | [SIL OFL 1.1](licenses/FiraCode-OFL-1.1.txt), [Nerd Fonts notices](licenses/nerd-fonts-LICENSE.txt), and retained glyph notices below |
 
-The webterm component is adapted for pane lifecycle and focus, consumed-byte replay offsets, shared cursor-anchored mobile input, clipboard/IME handling and focused-pane search. The CSS is adapted for the workspace. Its original MIT notice is retained. The ghostty-web fork includes MIT-licensed adaptations from [rundel/ghostterm](https://github.com/rundel/ghostterm) for ABI layouts, search integration and cooperative parsing.
+The webterm component is adapted for native desktop textarea focus, cursor-anchored composition, same-origin viewer handoff, pane lifecycle, consumed-byte replay offsets, shared cursor-anchored mobile input, clipboard/IME handling and focused-pane search. The CSS is adapted for the workspace. Its original MIT notice is retained. The ghostty-web fork includes MIT-licensed adaptations from [rundel/ghostterm](https://github.com/rundel/ghostterm) for ABI layouts, search integration and cooperative parsing.
 
 ## Font glyph notices
 
