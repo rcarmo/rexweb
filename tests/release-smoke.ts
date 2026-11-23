@@ -12,7 +12,7 @@ try {
  const bundle=join(scratch,name),binary=join(bundle,"bin/rexweb");
  const info=Bun.spawnSync([binary,"-version"]);
  assert(info.exitCode===0&&new TextDecoder().decode(info.stdout).startsWith(`rexweb ${version} (`),"incorrect build version");
- for(const path of ["LICENSE","THIRD_PARTY_NOTICES.md","licenses/ghostty-web-MIT.txt","deploy/rexweb.service"]) assert(await Bun.file(join(bundle,path)).exists(),"missing "+path);
+ for(const path of ["LICENSE","docs/three-pane-workspace.png","THIRD_PARTY_NOTICES.md","licenses/ghostty-web-MIT.txt","deploy/rexweb.service"]) assert(await Bun.file(join(bundle,path)).exists(),"missing "+path);
  assert(!await Bun.file(join(bundle,"web/dist/index.html")).exists(),"frontend was not packaged solely inside executable");
  const test=Bun.spawn(["bun","tests/rex-smoke.ts",binary],{stdout:"inherit",stderr:"inherit",env:process.env});
  assert(await test.exited===0,"extracted binary smoke failed");

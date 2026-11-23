@@ -11,7 +11,8 @@ mkdir -p dist
 for arch in arm64 amd64; do
  name="rexweb-$release_version-linux-$arch"
  stage="$scratch/$name"
- mkdir -p "$stage/bin"
+ mkdir -p "$stage/bin" "$stage/docs"
+ cp docs/three-pane-workspace.png "$stage/docs/"
  CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
   -ldflags "-s -w -X main.version=$release_version -X main.commit=$revision" \
   -o "$stage/bin/rexweb" ./cmd/rexweb

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-11-23
+
+- Added `-base-path` for serving the browser client under a reverse proxy URL prefix.
+- Fixed desktop text input and IME positioning. Viewing the same pane in another tab now hands off the connection instead of competing for it.
+- Updated wazero to 1.12.0 and Go supplementary modules; builds now require Go 1.26 or later.
+- Added a three-pane workspace screenshot to the README and included it in release archives.
+
 ## 0.1.0 — 2026-11-13
 
 - Keep the workspace aligned with Safari visual-viewport keyboard/accessory panning and resizing without overriding pinch zoom.
