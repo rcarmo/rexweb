@@ -1,4 +1,5 @@
 .PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke prefix-browser input-browser cross-browser vt-callbacks release clean
+.PHONY: rust-check
 .DEFAULT_GOAL := build
 
 VERSION ?= $(shell cat VERSION)
@@ -28,6 +29,9 @@ test: build-web
 check: build-web
 	go vet ./...
 	$(MAKE) test
+
+rust-check:
+	sh rust/check.sh
 
 race: build-web
 	go test -race ./...
