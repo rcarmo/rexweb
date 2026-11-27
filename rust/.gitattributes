@@ -1,0 +1,2 @@
+# Preserve upstream licence notices byte-for-byte and treat them as blobs.
+licenses/* binary

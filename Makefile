@@ -1,5 +1,5 @@
 .PHONY: install-dev typecheck build build-web build-go test check race smoke browser-smoke prefix-browser input-browser cross-browser vt-callbacks release clean
-.PHONY: rust-check
+.PHONY: rust-check rust-build rust-static-build
 .DEFAULT_GOAL := build
 
 VERSION ?= $(shell cat VERSION)
@@ -32,6 +32,14 @@ check: build-web
 
 rust-check:
 	sh rust/check.sh
+
+rust-build:
+	$(MAKE) rust-check
+	cd rust/backend && CARGO_TARGET_DIR=../capturechunk/target CARGO_INCREMENTAL=0 cargo oil build --release --locked
+	@echo "Rust executable: rust/capturechunk/target/release/rexweb"
+
+rust-static-build:
+	sh rust/static-build.sh
 
 race: build-web
 	go test -race ./...
