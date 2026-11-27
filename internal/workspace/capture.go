@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"rexweb/internal/capturechunk"
 	"rexweb/internal/vt"
 )
 
@@ -17,28 +18,6 @@ type captureBlob struct {
 	expires time.Time
 }
 
-// Native Rex paginates capture by encoded JSON size rather than raw text bytes.
-func jsonPrefix(data []byte, budget int) int {
-	if budget < 8 {
-		return 0
-	}
-	low, high, best := 0, min(len(data), budget), 0
-	for low <= high {
-		middle := low + (high-low)/2
-		end := middle
-		for end > 0 && end < len(data) && !utf8.RuneStart(data[end]) {
-			end--
-		}
-		encoded, _ := json.Marshal(string(data[:end]))
-		if len(encoded) <= budget {
-			best = end
-			low = middle + 1
-		} else {
-			high = middle - 1
-		}
-	}
-	return best
-}
 func (p *pane) nativeCapture(format string, trim, unwrap bool, maxBytes int) (fields, error) {
 	data, err := p.capture(format, trim, unwrap)
 	if errors.Is(err, vt.ErrCaptureLimit) {
@@ -55,7 +34,7 @@ func (p *pane) nativeCapture(format string, trim, unwrap bool, maxBytes int) (fi
 		return fields{"content": string(data)}, nil
 	}
 	limit := min(maxBytes, nativeJSONBudget)
-	end := jsonPrefix(data, limit)
+	end := capturechunk.JSONPrefix(string(data), limit)
 	if end == 0 && len(data) > 0 {
 		return nil, invalid("max_bytes (too small)")
 	}
@@ -103,7 +82,7 @@ func (p *pane) nativeBlob(id uint32, offset, maxBytes int) (fields, error) {
 	if maxBytes > 0 {
 		limit = min(maxBytes, limit)
 	}
-	end := offset + jsonPrefix(blob.data[offset:], limit)
+	end := offset + capturechunk.JSONPrefix(string(blob.data[offset:]), limit)
 	if end == offset && offset < len(blob.data) {
 		return nil, invalid("max_bytes (too small)")
 	}

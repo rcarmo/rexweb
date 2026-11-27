@@ -1,0 +1,5 @@
+{"fn":"JSONPrefix","args":["a<&",8]}
+{"fn":"JSONPrefix","args":["é🙂中",8]}
+{"fn":"JSONPrefix","args":["a\u2028b",9]}
+{"fn":"JSONPrefix","args":["\n\t\b\f\r",10]}
+{"fn":"JSONPrefix","args":["\u0000\u001b\"\\",14]}

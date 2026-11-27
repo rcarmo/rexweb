@@ -6,6 +6,8 @@ Based on [rcarmo/webterm](https://github.com/rcarmo/webterm), with its webterm c
 
 ![rexweb workspace with a full-height build pane on the left and service log and release file panes stacked on the right](docs/three-pane-workspace.png)
 
+The `rust` branch contains an in-progress [Rust backend migration](rust/README.md). The build below still uses Go.
+
 ## Build and run
 
 Build dependencies: Go 1.26 or later, Bun, Git and make. Runtime: Linux, `/bin/sh` (or your chosen shell), system tools and unprivileged user namespaces. No Bun, Docker, external sandbox program, frontend directory or Go installation is needed on the target machine.

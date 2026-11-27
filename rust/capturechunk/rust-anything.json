@@ -1,0 +1,40 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "../..",
+  "unit": "internal/capturechunk/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "capturechunk-rs",
+  "exports": [
+    {
+      "name": "JSONPrefix",
+      "file": "internal/capturechunk/chunk.go",
+      "line": 9,
+      "params": [
+        {
+          "name": "data",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "budget",
+          "ts_type": "int",
+          "optional": false,
+          "rest": false,
+          "native_type": "int"
+        }
+      ],
+      "returns": "int",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(int)",
+      "prototype": "func JSONPrefix(data string, budget int) int"
+    }
+  ],
+  "classes": [],
+  "js_only": []
+}
