@@ -1,53 +1,52 @@
-name: Release
+name: Rust candidate release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['v*-rust.*']
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   verify:
     uses: ./.github/workflows/ci.yml
+    with:
+      package-release: true
 
-  package:
+  draft:
     needs: verify
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          go-version: stable
-          check-latest: true
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: latest
-      - name: Check tag against VERSION
-        run: test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
-      - run: make install-dev
-      - name: Allow unprivileged user namespaces for sandbox tests
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: make release
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: release-archives
-          path: dist/
-          if-no-files-found: error
-      - name: Create draft release
+          path: artifacts
+          pattern: rust-release-*
+      - name: Assemble and verify the native packages
+        run: |
+          version=$(cat VERSION)
+          test "$GITHUB_REF_NAME" = "v$version"
+          mkdir dist
+          for arch in arm64 amd64; do
+            name="rexweb-$version-rust-linux-$arch.tar.gz"
+            cp "artifacts/rust-release-$arch/$name" dist/
+            cat "artifacts/rust-release-$arch/SHA256SUMS-rust" >> dist/SHA256SUMS-rust
+          done
+          (cd dist && sha256sum --check --strict SHA256SUMS-rust)
+      - name: Create draft prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(cat VERSION)
-          case "$version" in
-            *-*) set -- --prerelease ;;
-            *) set -- ;;
-          esac
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS \
-            --verify-tag --draft "$@" --title "rexweb $version" \
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS-rust \
+            --verify-tag --draft --prerelease --title "rexweb $version" \
             --notes-file CHANGELOG.md

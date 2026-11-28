@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "bun run typecheck && bun build src/workspace.ts --outfile=dist/static/js/workspace.js --target=browser --minify && cp node_modules/ghostty-web/ghostty-vt.wasm dist/static/js/ && cp -R assets/. dist/static/ && cp -R ../licenses dist/static/ && cp ../THIRD_PARTY_NOTICES.md dist/static/ && cp index.html dist/"
+    "build": "bun run typecheck && rm -rf dist && bun build src/workspace.ts --outfile=dist/static/js/workspace.js --target=browser --minify && cp node_modules/ghostty-web/ghostty-vt.wasm dist/static/js/ && cp -R assets/. dist/static/ && mkdir -p dist/static/licenses && find ../licenses -maxdepth 1 -type f -exec cp {} dist/static/licenses/ \\; && cp ../THIRD_PARTY_NOTICES.md dist/static/ && cp index.html dist/"
   },
   "type": "module",
   "dependencies": {

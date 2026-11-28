@@ -2,10 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [rust]
   pull_request:
+    branches: [rust]
   workflow_dispatch:
   workflow_call:
+    inputs:
+      package-release:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,30 +19,88 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   verify:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04-arm, ubuntu-24.04]
+        include:
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            rust-arch: aarch64
+            oak-oil-sha256: 5343ffe2c53650c3bfbd5532ae4edc13e4063d53e0eb76386a63c1ed3174aa8f
+            rex-sha256: f079c5bcc69a2960b400b9c3e80f341b2e3951c205cc9282869cfab0be9ff5eb
+          - runner: ubuntu-24.04
+            arch: amd64
+            rust-arch: x86_64
+            oak-oil-sha256: 00ed54d1635492436a4b1e84081ba393723daddf1c3045a2b2744b8457450d62
+            rex-sha256: 90b2429036d26f317aaac2490d014e07c9351b0b994b1329afce94b8ad4d333c
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      ARCH: ${{ matrix.arch }}
+      RUST_ARCH: ${{ matrix.rust-arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: stable
-          check-latest: true
+      - name: Check tag against VERSION
+        if: inputs.package-release
+        run: test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
-      - name: Allow unprivileged user namespaces for sandbox tests
+      - name: Install the pinned Rust toolchain and native musl target
+        run: |
+          rustup show
+          rustup target add "$RUST_ARCH-unknown-linux-musl"
+      - name: Install verified Oak Oil and official Rex CLI archives
+        env:
+          OAK_OIL_SHA256: ${{ matrix.oak-oil-sha256 }}
+          REX_SHA256: ${{ matrix.rex-sha256 }}
+        run: |
+          cd "$RUNNER_TEMP"
+          download() {
+            curl --fail --silent --show-error --location --retry 3 --output "$2" "$1/$2"
+            printf '%s  %s\n' "$3" "$2" | sha256sum --check --strict
+          }
+          oil=v0.3.2
+          oil_archive="cargo-oil-$oil-$RUST_ARCH-unknown-linux-gnu.tar.gz"
+          download "https://github.com/oakoliver/oak-oil/releases/download/$oil" "$oil_archive" "$OAK_OIL_SHA256"
+          tar -xzf "$oil_archive" --strip-components=1 "${oil_archive%.tar.gz}/cargo-oil"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          # Official Rex 0.1.0-preview.16, pinned independently of rexweb.
+          rex_commit=aa2db1b21261b479a550559fb70e2c3a66c07ba2
+          rex_archive="rex-linux-$ARCH.tar.gz"
+          download "https://blob.superlogical.com/download/rex/preview/$rex_commit" "$rex_archive" "$REX_SHA256"
+          tar -xzf "$rex_archive" rex
+          "$RUNNER_TEMP/rex" version
+          echo "REX_REFERENCE_BIN=$RUNNER_TEMP/rex" >> "$GITHUB_ENV"
+      - name: Allow unprivileged user namespaces for fail-closed sandbox tests
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: make install-dev
-      - run: make check race smoke
+      - run: make check
+      - name: Build and smoke-test the static service
+        if: '!inputs.package-release'
+        run: |
+          make build
+          REXWEB_BIN="$PWD/bin/rexweb" make smoke
+      - name: Build, package and smoke-test the extracted static service
+        if: inputs.package-release
+        run: make release
       - run: cd web && bunx playwright install --with-deps chromium
-      - run: make prefix-browser
-      - run: make browser-smoke
-      - run: make input-browser
+      - name: Test browser workspace, uploads, prefix and input against the static service
+        run: REXWEB_BIN="$PWD/bin/rexweb" make prefix-browser browser-smoke input-browser
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.package-release
+        with:
+          name: rust-release-${{ matrix.arch }}
+          path: |
+            dist/rexweb-*-rust-linux-${{ matrix.arch }}.tar.gz
+            dist/SHA256SUMS-rust
+          if-no-files-found: error
+          compression-level: 0

@@ -1,0 +1,3 @@
+# Preserve upstream licence notices byte-for-byte and treat them as blobs.
+licenses/rust/* binary
+licenses/rust/RUST-DEPENDENCIES.md diff

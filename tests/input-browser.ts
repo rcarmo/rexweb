@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {mkdtemp,rm} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import { join } from 'node:path';
+import { rexwebBinary } from './rexweb-binary';
 import {chromium,type Browser,type Frame,type Page} from '../web/node_modules/playwright';
 
 const scratch=await mkdtemp('/tmp/rexweb-input-browser-');
@@ -19,7 +20,7 @@ async function until(check:()=>Promise<boolean>,message:string){
   for(let i=0;i<100;i++){if(await check())return;await Bun.sleep(50);}if(diagnostic)console.error('INPUT DIAGNOSTIC',await diagnostic.evaluate(()=>({active:document.activeElement?.outerHTML.slice(0,180),dialogs:[...document.querySelectorAll('dialog')].map(d=>({id:d.id,open:d.open})),terminals:[...document.querySelectorAll('.webterm-terminal')].map(e=>e.className)})));throw Error(message);
 }
 try{
-  child=spawn(resolve('bin/rexweb'),['-mode','web','-listen','127.0.0.1:0','-isolation','host','-workspace',join(scratch,'work'),'-session-socket',join(scratch,'run/session.sock')],{stdio:['ignore','ignore','pipe']});
+  child=spawn(rexwebBinary(),['-mode','web','-listen','127.0.0.1:0','-isolation','host','-workspace',join(scratch,'work'),'-session-socket',join(scratch,'run/session.sock')],{stdio:['ignore','ignore','pipe']});
   child.stderr!.on('data',chunk=>logs+=chunk);
   for(let i=0;i<200&&!logs.includes('Ready:');i++){assert(child.exitCode===null,logs);await Bun.sleep(50);}
   const address=logs.match(/Web listener at (\S+)/)?.[1];assert(address,logs);origin='http://'+address;

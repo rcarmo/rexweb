@@ -1,6 +1,7 @@
 import { chromium, firefox, webkit, type Page } from '../web/node_modules/playwright';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { rexwebBinary } from './rexweb-binary';
 
 /** Synthetic Safari viewport events; not a claim of physical iPad validation. */
 export async function checkViewport(page: Page) {
@@ -76,7 +77,7 @@ export async function checkViewport(page: Page) {
 
 if (import.meta.main) {
   const scratch = await mkdtemp('/tmp/rexweb-viewport-browser.');
-  const server = Bun.spawn([resolve('bin/rexweb'), '-mode','web','-listen','127.0.0.1:0','-session-socket',join(scratch,'run/session.sock'),'-workspace',join(scratch,'work')], { stdout:'pipe', stderr:'pipe' });
+  const server = Bun.spawn([rexwebBinary(), '-mode','web','-listen','127.0.0.1:0','-session-socket',join(scratch,'run/session.sock'),'-workspace',join(scratch,'work')], { stdout:'pipe', stderr:'pipe' });
   let logs=''; void(async()=>{for await(const chunk of server.stderr) logs+=new TextDecoder().decode(chunk)})();
   let browser;
   try {

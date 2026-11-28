@@ -4,12 +4,13 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {mkdtemp,rm} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import { join } from 'node:path';
+import { rexwebBinary } from './rexweb-binary';
 import {chromium,type Browser} from '../web/node_modules/playwright';
 const scratch=await mkdtemp('/tmp/rexweb-prefix-');
 let child:ReturnType<typeof spawn>|undefined,browser:Browser|undefined,logs='';
 try{
- child=spawn(resolve('bin/rexweb'),['-mode','web','-listen','127.0.0.1:0','-base-path','/terminal/','-workspace',join(scratch,'work'),'-session-socket',join(scratch,'run/session.sock')],{stdio:['ignore','ignore','pipe']});
+ child=spawn(rexwebBinary(),['-mode','web','-listen','127.0.0.1:0','-base-path','/terminal/','-workspace',join(scratch,'work'),'-session-socket',join(scratch,'run/session.sock')],{stdio:['ignore','ignore','pipe']});
  child.stderr!.on('data',data=>logs+=data);
  for(let i=0;i<200&&!logs.includes('Ready:');i++){assert.equal(child.exitCode,null,logs);await Bun.sleep(50);}
  const address=logs.match(/Web listener at (\S+)/)?.[1];assert(address,logs);const origin='http://'+address;
@@ -19,7 +20,8 @@ try{
  page.on('pageerror',e=>errors.push(String(e)));
  page.on('request',r=>requests.push(new URL(r.url()).pathname));
  page.on('websocket',ws=>sockets.push(new URL(ws.url()).pathname));
- await page.goto(origin+'/terminal/');await page.locator('.webterm-terminal.-connected').waitFor();
+ assert.equal((await page.goto(origin+'/terminal/'))?.status(),200,'prefixed index did not load');
+ await page.locator('.webterm-terminal.-connected').waitFor();
  assert.equal(await page.locator('base').getAttribute('href'),'/terminal/');
  await page.getByRole('button',{name:'New tab',exact:true}).click();
  await page.waitForFunction(()=>document.querySelectorAll('.window-tab').length===2);

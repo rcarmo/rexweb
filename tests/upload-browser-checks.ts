@@ -1,11 +1,12 @@
 import {chromium, type Browser} from '../web/node_modules/playwright';
 import {mkdtemp,writeFile,rm,readFile,stat} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import { join } from 'node:path';
+import { rexwebBinary } from './rexweb-binary';
 
 export async function checkUploads(){
  const scratch=await mkdtemp('/tmp/rexweb-upload-browser.');const password='uploads-test-password-0123456789';
  await writeFile(join(scratch,'password'),password,{mode:0o600});
- const process=Bun.spawn([resolve('bin/rexweb'),'-mode','web','-listen','127.0.0.1:0','-uploads','-password-file',join(scratch,'password'),'-session-socket',join(scratch,'run/session.sock'),'-workspace',join(scratch,'work')],{stdout:'pipe',stderr:'pipe'});
+ const process=Bun.spawn([rexwebBinary(),'-mode','web','-listen','127.0.0.1:0','-uploads','-password-file',join(scratch,'password'),'-session-socket',join(scratch,'run/session.sock'),'-workspace',join(scratch,'work')],{stdout:'pipe',stderr:'pipe'});
  let logs='';void(async()=>{for await(const chunk of process.stderr)logs+=new TextDecoder().decode(chunk)})();
  const authorization='Basic '+btoa('rexweb:'+password);const assert=(value:unknown,message:string)=>{if(!value)throw new Error(message)};
  let browser:Browser|undefined;
@@ -41,3 +42,5 @@ export async function checkUploads(){
   console.log('Upload browser checks passed: clipboard image, file picker, confined names/permissions, auth/origin and path insertion without Enter.');
  }finally{await browser?.close();process.kill();await process.exited;await rm(scratch,{recursive:true,force:true})}
 }
+
+if (import.meta.main) await checkUploads();

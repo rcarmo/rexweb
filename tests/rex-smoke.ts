@@ -1,8 +1,9 @@
 import { mkdtemp, mkdir, writeFile, rm, stat } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { join } from "node:path";
+import { rexwebBinary } from "./rexweb-binary";
 import { smokeNative } from "./rex-native";
 
-const binary = resolve(Bun.argv[2] ?? "bin/rexweb");
+const binary = rexwebBinary(Bun.argv[2]);
 const scratch = await mkdtemp("/tmp/rexweb-smoke.");
 const services = new Set<ReturnType<typeof Bun.spawn>>();
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }

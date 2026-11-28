@@ -2,9 +2,9 @@
 
 ## Process and persistence
 
-One foreground process owns the session Store, PTYs, private Unix listener and selected TCP listeners. `-mode web` enables browser TCP, `-mode rex` enables native TCP, and `-mode both` enables both. The private local Rex socket is always present. Each pane also owns an isolated Ghostty VT module in a shared pure-Go WASM compilation cache. Default addresses are loopback. All selected listeners must bind successfully; a startup error exits nonzero and releases already-opened listeners. A socket lifetime lock prevents concurrent service instances on the same socket. Regular files are never replaced as stale sockets.
+One foreground Rust process owns session state, PTYs, the private Unix listener and selected TCP listeners. `-mode web` enables browser TCP, `-mode rex` enables native TCP, and `-mode both` enables both. The private local Rex socket is always present. Each pane owns a separate Ghostty VT instance; the service shares the compiled Wasmi modules. Default addresses are loopback. All selected listeners must bind successfully; a startup error exits nonzero and releases already-opened listeners. A socket lifetime lock prevents concurrent service instances on the same socket. Regular files are never replaced as stale sockets.
 
-SIGINT/SIGTERM closes HTTP servers, hijacked WebSockets and panes. Shells and layouts survive client disconnects. They do not survive service termination. Workspace files persist, and `-workspace` allows a stable location across service restarts. A fresh service starts one default shell.
+SIGINT/SIGTERM stops the listeners and closes WebSocket connections and panes. Shells and layouts survive client disconnects. They do not survive service termination. Workspace files persist, and `-workspace` allows a stable location across service restarts. A fresh service starts one default shell.
 
 ## Sessions and streams
 
@@ -22,10 +22,12 @@ Supported control methods:
 - `session.list`, `session.attach`, `session.detach`, `session.attach_all`, `session.bootstrap`, `session.view`, `session.create`, `session.destroy`, `session.set_label`.
 - `session.new_window`, `session.close_window`, `session.set_window_label`, `session.focus_window`, `session.focus_block`, `session.new_split`, `session.resize_pane`, `block.close`.
 - `session.own_block`, `session.disown_block`, `data.connect`, `client.key`, `block.event`, `block.method` and creator-qualified terminal methods.
-- `target.resolve` for sessions, windows and blocks, including exact IDs, labels, window positions, suffixes and ambiguity reporting.
+- `target.resolve` for sessions, windows and blocks, including exact IDs, labels, window positions, suffixes and ambiguity reporting. Block lookup supports session scope but does not honour window scope.
 - `session.describe_block`, `session.list_blocks` with terminal metadata for CLI input commands.
 
-Terminal methods: write, resize, size, input_mode (Linux TCGETS), title (empty), pwd (initial workspace), process (initial shell metadata), program_status (empty), set_theme (no-op). Paste, focus events and basic key encoding are supported. These metadata methods do not inspect arbitrary foreground processes or reconstruct a terminal screen.
+`session.bootstrap` can attach sessions but does not issue data tickets. Use `data.connect` before opening a data stream.
+
+Terminal methods: `write`, `resize`, `size`, `input_mode` (Linux `TCGETS`), `title`, `pwd`, `process`, `program_status`, `set_theme` (no-op), `format`, and `blob_read`. Title, working directory and program status reflect VT reports. Process metadata describes the initial shell. The service does not inspect the live foreground process or its ancestry. Paste, focus events and basic key encoding are supported.
 
 Creation accepts one initial shell tab; custom command layouts and initial input are rejected. Floating panes, Lua, target completion, full discovery/help, downloads and native file-transfer automation, native stream resume and multi-user login are outside this subset. Unknown methods fail explicitly. Revision 13 is not advertised.
 
@@ -33,7 +35,7 @@ Creation accepts one initial shell tab; custom command layouts and initial input
 
 Default shell isolation uses Linux namespaces and fails closed. Host isolation is a deliberate full-account option. Remote web requires password authentication and a fixed public origin. Remote native TCP requires anonymous-access opt-in. See [SECURITY.md](SECURITY.md) for precise boundaries.
 
-Run `make check`, `make race`, `make smoke` and `make release`. Smoke tests cover execution from an empty directory, embedded assets/WASM, sandbox file/network/socket denial, capability drop, PTY resizing, reconnect offsets, nested splits, native wire streams, shared layouts, mode selection, web authentication and shutdown. Set `REX_REFERENCE_BIN` for optional official CLI tests over both native transports.
+Run `make check`, `make smoke` and `make release` on the target Linux architecture. Smoke tests cover embedded assets/WASM, sandbox file/network/socket denial, capability drop, PTY resizing, reconnect offsets, nested splits, native wire streams, shared layouts, mode selection, web authentication and shutdown. Release verification runs the extracted executable from an empty directory. Set `REX_REFERENCE_BIN` to also test the official CLI over both native transports.
 
 ## Browser search and shared input
 
@@ -43,19 +45,19 @@ Mobile input remains a single shared textarea/keybar. Its anchor follows the foc
 
 ## Authoritative capture
 
-The server embeds the same Ghostty WASM as the browser bundle and executes it through wazero, without CGO or an external runtime. Each pane has an independent module with a 64 MiB memory cap and bounded calls; output is fed before publication. Native `format`/`blob_read` and the browser capture endpoint read this state without requiring a viewer. Browser command-palette exports support text, HTML and VT. Captures cover the active screen and its retained history (2000 lines/16 MiB, page-granular pruning), with a 4 MiB export cap. Native chunks obey encoded JSON limits; at most 4 MiB of temporary blobs is retained per pane. HTML export is sanitised and supplied with an offline CSP.
+The server runs the browser bundle's embedded Ghostty WASM in Wasmi, without an external runtime. Each pane has an independent instance with a 64 MiB memory cap and a bounded instruction budget per call; output is fed before publication. Native `format`/`blob_read` and the browser capture endpoint read this state without requiring a viewer. Browser command-palette exports support text, HTML and VT. Captures cover the active screen and its retained history (2000 lines/16 MiB, page-granular pruning), with a 4 MiB export cap. Native chunks obey encoded JSON limits; at most 4 MiB of temporary blobs is retained per pane. HTML export is sanitised and supplied with an offline CSP.
 
 The server is authoritative for terminal query replies. The embedded browser sets emitTerminalResponses=false so replay and live parser activity cannot generate duplicate replies. Capture does not imply service-restart session persistence or a stable native snapshot wire format.
 
 ## Program and prompt effects
 
-The server records bounded OSC 7501 statuses and reported title/pwd using Ghostty callbacks. HTTP session views carry a separate terminal_metadata extension for browser badges, leaving native Rex session-view shapes unchanged. Native program_status/title/pwd read the same metadata. Records and prompt events are cleared on VT reset; process exit and VT failure are reflected in browser state.
+The server records bounded OSC 7501 statuses and reported title/pwd using Ghostty callbacks. Session views carry a `terminal_metadata` extension for browser badges. Native `program_status`, `title` and `pwd` read the same state. Records and prompt events are cleared on VT reset. Shell exit is reflected in browser state.
 
 Default supported shells receive OSC 133 PS1 hooks. Browser Previous/Next prompt navigation uses the client's core marks, temporarily reading core scroll positions and restoring the live viewport before updating external scroll state. No shell input is emitted.
 
 ## Web image/file uploads
 
-`-uploads` plus password authentication enables one-file multipart POST uploads. The initiating session/pane must exist. The generated workspace name, detected MIME, size and absolute path are returned as JSON. Storage is rooted in a pinned directory descriptor, with no-follow/exclusive creation, complete-request validation and no-replace atomic commit. Partial files are removed. Browser clipboard/drop/file-picker integrations upload at most eight files sequentially and paste quoted paths without Enter into the initiating live pane. Limits are 16 MiB/file, four server requests and two minutes/request. No automatic retry or uploaded-file serving is provided.
+`-uploads` plus password authentication enables multipart POST uploads with a matching Origin. The browser sends one file per request; the server buffers the first multipart field and limits it to 16 MiB. The initiating session and pane must exist. The generated workspace name, detected MIME, size and absolute path are returned as JSON. The server uses a pinned directory descriptor, creates an exclusive no-follow temporary file and publishes it through a no-replace hard link. Browser clipboard, drop and file-picker integrations upload at most eight files sequentially and paste quoted paths without Enter into the initiating live pane. There is no automatic retry or uploaded-file serving. See [SECURITY.md](SECURITY.md) for request limits.
 
 ## Resolved image frames
 

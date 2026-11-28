@@ -6,10 +6,11 @@ import { checkGPU } from "./gpu-browser-checks";
 import { checkBidi } from "./bidi-browser-checks";
 import { chromium } from "../web/node_modules/playwright";
 import { mkdtemp, rm } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { join } from "node:path";
+import { rexwebBinary } from "./rexweb-binary";
 
 const scratch=await mkdtemp("/tmp/rexweb-browser.");
-const server=Bun.spawn([resolve("bin/rexweb"),"-mode","web","-listen","127.0.0.1:0","-session-socket",join(scratch,"run/session.sock"),"-workspace",join(scratch,"work")],{stdout:"pipe",stderr:"pipe"});
+const server=Bun.spawn([rexwebBinary(),"-mode","web","-listen","127.0.0.1:0","-session-socket",join(scratch,"run/session.sock"),"-workspace",join(scratch,"work")],{stdout:"pipe",stderr:"pipe"});
 let logs="";void(async()=>{for await(const data of server.stderr)logs+=new TextDecoder().decode(data)})();
 const shared=Boolean(process.env.BROWSER_CDP_URL);
 const browser=await (async()=>{
@@ -35,6 +36,15 @@ async function helperCount(count=1) {
 async function typeMobile(data:string) {
  await page.locator("[data-mobile-keyboard-input]").evaluate((input,data)=>input.dispatchEvent(new InputEvent("beforeinput",{inputType:"insertText",data,bubbles:true,cancelable:true})),data);
  await page.waitForTimeout(100);
+}
+async function waitForPasteMode(pane: "LEFT" | "RIGHT") {
+ // The marker follows the mode sequence in the same VT stream. Search proves
+ // Ghostty consumed both bytes, rather than guessing when the shell ran.
+ await page.getByRole("button",{name:"Find in pane",exact:true}).click();
+ const search=page.getByRole("searchbox",{name:"Find in focused pane",exact:true});
+ await search.fill(`PASTE-READY-${pane}`);
+ await page.waitForFunction(()=>document.querySelector("#search-results")?.textContent==="1 / 1");
+ await search.press("Escape");
 }
 try {
  for(let i=0;i<100&&!logs.includes("Ready:");i++){assert(server.exitCode===null,"server exited: "+logs);await Bun.sleep(50)}
@@ -128,8 +138,8 @@ try {
  // Paste must use Ghostty's sanitisation and bracketed-paste mode, and
  // duplicate paste/beforeinput notifications must not type text twice.
  await typeMobile("\x03");
- await typeMobile("printf '\\033[?2004h'\r");
- await page.waitForTimeout(300);
+ await typeMobile("printf '\\033[?2004hPASTE-READY-%s\\n' LEFT\r");
+ await waitForPasteMode("LEFT");
  const pasted = "paste-λ\nsecond\x1b[201~";
  let from = frames.length;
  await page.locator("[data-mobile-keyboard-input]").evaluate((input,text)=>{
@@ -150,8 +160,8 @@ try {
  const wrapped="\x1b[200~"+large+"\x1b[201~";
  const bytes=new TextEncoder().encode(wrapped).length;
  await panes.nth(1).locator(".webterm-terminal").click();
- await typeMobile(`printf '\\033[?2004h'; stty -echo -icanon min 1 time 0; head -c ${bytes} > "$TMPDIR/paste-check"; stty echo icanon; printf '\\033[?2004l'\r`);
- await page.waitForTimeout(300);
+ await typeMobile(`stty -echo -icanon min 1 time 0; printf '\\033[?2004hPASTE-READY-%s\\n' RIGHT; head -c ${bytes} > "$TMPDIR/paste-check"; stty echo icanon; printf '\\033[?2004l'\r`);
+ await waitForPasteMode("RIGHT");
  from=frames.length;
  await page.locator("[data-mobile-keyboard-input]").evaluate((input,text)=>{
   const data=new DataTransfer();data.setData("text/plain",text);

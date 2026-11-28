@@ -1,0 +1,17 @@
+[build]
+incremental = false
+
+[target.aarch64-unknown-linux-musl]
+linker = "rust-lld"
+
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
+
+# ring has target-native C sources. clang can build them for either musl target.
+[env]
+CC_aarch64_unknown_linux_musl = "clang"
+CFLAGS_aarch64_unknown_linux_musl = "--target=aarch64-unknown-linux-musl"
+AR_aarch64_unknown_linux_musl = "ar"
+CC_x86_64_unknown_linux_musl = "clang"
+CFLAGS_x86_64_unknown_linux_musl = "--target=x86_64-unknown-linux-musl"
+AR_x86_64_unknown_linux_musl = "ar"

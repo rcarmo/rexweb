@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's MIT licence applies to its own code. The following components retain their upstream licences. Release archives include this file and the `licenses/` directory; the built frontend also serves them under `/static/`.
+The project's MIT licence applies to its own code. Release archives include this file and the `licenses/` directory. The embedded browser frontend also serves this file and the browser and WASM notices under `/static/`.
 
 | Component | Version or source | Licence and retained notice |
 | --- | --- | --- |
@@ -15,11 +15,6 @@ The project's MIT licence applies to its own code. The following components reta
 | uucode and generated Unicode tables | 0.2.0, used by Ghostty's VT build | [MIT](licenses/uucode-LICENSE.md), with retained [UTF-8 decoder](licenses/uucode-licenses-LICENSE_Bjoern_Hoehrmann) and [Unicode data](licenses/uucode-licenses-LICENSE_unicode) notices |
 | Wuffs image decoding support | [0.4.0-alpha.10, commit 7411f488fe2e2c205c3d3b3d28638b7356522930](https://github.com/google/wuffs/tree/7411f488fe2e2c205c3d3b3d28638b7356522930), linked by the Ghostty VT build | MIT (selected from Apache-2.0 OR MIT); [notice](licenses/wuffs-MIT.txt) |
 | Zig runtime | 0.17.0, used to build the bundled VT WASM | [MIT](licenses/zig-MIT.txt) |
-| Go standard library and runtime | Compiler version is recorded by `go version -m` on each release binary | [BSD-3-Clause](licenses/go-BSD-3-Clause.txt) |
-| wazero WASM runtime | [v1.12.0](https://github.com/tetratelabs/wazero/tree/v1.12.0), pure-Go server-side VT execution | [Apache-2.0](licenses/wazero-Apache-2.0.txt), [NOTICE](licenses/wazero-NOTICE.txt) |
-| Go supplementary modules | golang.org/x/net v0.62.0 (HTML export policy), golang.org/x/sys v0.49.0 (runtime platform support) | [BSD-3-Clause](licenses/golang-supplementary-BSD.txt) |
-| creack/pty | [v1.1.24](https://github.com/creack/pty/tree/v1.1.24) | [MIT](licenses/creack-pty-MIT.txt), copyright 2011 Keith Rarick |
-| Gorilla WebSocket | [v1.5.3](https://github.com/gorilla/websocket/tree/v1.5.3) | [BSD-2-Clause](licenses/gorilla-websocket-BSD-2-Clause.txt), copyright 2013 The Gorilla WebSocket Authors |
 | FiraCode Nerd Font | Fira Code 6.002, patched with Nerd Fonts 3.4.0, as recorded in the font's name table | [SIL OFL 1.1](licenses/FiraCode-OFL-1.1.txt), [Nerd Fonts notices](licenses/nerd-fonts-LICENSE.txt), and retained glyph notices below |
 
 The webterm component is adapted for native desktop textarea focus, cursor-anchored composition, same-origin viewer handoff, pane lifecycle, consumed-byte replay offsets, shared cursor-anchored mobile input, clipboard/IME handling and focused-pane search. The CSS is adapted for the workspace. Its original MIT notice is retained. The ghostty-web fork includes MIT-licensed adaptations from [rundel/ghostterm](https://github.com/rundel/ghostterm) for ABI layouts, search integration and cooperative parsing.
@@ -36,6 +31,10 @@ The patched font retains its SIL Open Font License. Its glyph sources also carry
 - [Powerline Extra Symbols](licenses/nerd-fonts-powerline-extra-LICENSE.txt): MIT.
 - [Powerline Symbols](licenses/nerd-fonts-powerline-symbols-LICENSE.txt): retained upstream permission notice.
 
-The font is redistributed without local modifications. No Rex app executable, artwork or logo is bundled. The optional native adapter uses a blank Ghostty snapshot captured from an idle, reset `/bin/cat` block in Rex `0.1.0-preview.14`; the fixture contains terminal state, with no program output or filesystem paths. Its provenance is recorded beside the embedded fixture in `internal/workspace/rex_terminal.go`.
+The font is redistributed without local modifications. No Rex app executable, artwork or logo is bundled. Native Rex support uses a blank Ghostty snapshot captured from an idle, reset `/bin/cat` block in Rex `0.1.0-preview.14`. The fixture contains terminal state, with no program output or filesystem paths.
 
-Go modules are pinned in `go.mod` and `go.sum`. Browser and build dependencies are pinned in `web/bun.lock`. TypeScript and Bun are build tools; their executables are not included in the release archives.
+## Rust dependency notices
+
+The [crate licence index and retained notices](licenses/rust/RUST-DEPENDENCIES.md) are generated from `Cargo.lock` and included in the source tree and release archives. Run `bun scripts/licenses.ts` after updating Rust dependencies, or add `--check` to verify the retained copies without changing them.
+
+Browser and frontend build dependencies are pinned in `web/bun.lock`. TypeScript and Bun are build tools; their executables are not included in the release archives.

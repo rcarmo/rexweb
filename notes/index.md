@@ -1,4 +1,4 @@
 # Notes
 
-- [Linux service scope and verification](linux-service.md)
-- [Ranked terminal feature backlog](feature-priorities.md)
+- [Linux service scope and Rust candidate verification](linux-service.md)
+- [Terminal feature coverage and provenance](feature-priorities.md)

@@ -1,6 +1,6 @@
 # Terminal feature coverage
 
-All ten requested areas are incorporated. The options and compatibility limits below describe what is shipped, rather than a future backlog.
+The Rust candidate carries forward these ten feature areas. The table describes the supported subset and its limits; for the release checks, see [RELEASING.md](../RELEASING.md).
 
 | Feature | Incorporated behaviour | Limits |
 | --- | --- | --- |
@@ -10,7 +10,7 @@ All ten requested areas are incorporated. The options and compatibility limits b
 | Advanced search | Case, whole-word and linear-time RE2JS regex modes; cancellable snapshots and wrapped/Unicode cell mapping | Bounded cells/text/matches; unsupported regex syntax is rejected and partial results are marked. |
 | Image/file paste | Authenticated picker, clipboard image and drop uploads; confined atomic storage and quoted path insertion without Enter | Explicit `-uploads`, password authentication, Origin validation, per-file/request/concurrency limits; no automatic retry. |
 | Core/rectangular selection | Core pins and formatter for linear copy; Alt-drag/programmatic rectangles, backward gestures and history | In BiDi mode rectangle columns are visual and copied cells are emitted in logical order per row. |
-| Server VT and capture | Pure-Go wazero execution of the embedded Ghostty core, shared compilation, authoritative replies, browser and native capture | Bounded memory/history/calls/captures; no external runtime process. |
+| Server VT and capture | Wasmi execution of the embedded Ghostty core, shared compilation, authoritative replies, browser and native capture | Bounded memory/history/calls/captures; no external runtime process. |
 | Resolved/animated Kitty images | Resolved geometry, layers, crops and generations; bounded owned pixels and deadline-driven animation | Server PNG/image budgets and client memory bounds; timers stop on reset/disposal/suspension/held output. |
 | WebGPU and fallback | Opt-in GPU compositor, bounded texture storage and device-loss promotion to Canvas without discarding VT/selection | Canvas still rasterises glyphs; no GPU-side glyph layout/instancing. GPU display behaviour is unvalidated in this environment. |
 | RTL/BiDi | Opt-in row-local ordering with mapped cursor/IME, linear/rectangle selection, search highlights, links and mouse reports | Unicode 13 BiDi tables, LTR paragraph base; no Arabic joining/shaping or cross-row paragraph layout. Image-placeholder rows retain logical order. |
@@ -22,11 +22,11 @@ Use the command palette's **Try WebGPU compositor (reload)** and **Enable RTL/Bi
 ## Verification
 
 - ghostty-web: 532 passing tests and two existing historical scrollback skips; formatting, lint, type checking and rebuilt distributions pass.
-- rexweb: Go vet/unit tests, race detector, frontend checks, Linux sandbox/security/native/TLS smoke and official Rex CLI interoperability pass.
-- Chromium: full workspace/input/replay/upload checks, shared-helper checks, option reload/session preservation, fractional DPR, image animation and BiDi mapping/copy tests pass.
-- Firefox and desktop WebKit: Canvas recovery/DEC guards, wheel/link behaviour, rectangle copy, image animation and BiDi cursor/link/mouse/copy tests pass. Their GPU-unavailable Canvas paths pass. Fractional-DPR overrides remain Chromium-only.
+- See the [Rust migration record](linux-service.md#rust-migration-record) for service and package verification. The published Go release, including its Go vet and race-detector results, is historical reference only.
+- The Rust port's Chromium workspace suite covers input/replay/uploads, shared-helper checks, option reload/session preservation, fractional DPR, image animation and BiDi mapping/copy tests.
+- Firefox and desktop WebKit regression checks cover Canvas recovery/DEC guards, wheel/link behaviour, rectangle copy, image animation and BiDi cursor/link/mouse/copy. Their GPU-unavailable Canvas paths pass. Fractional-DPR overrides remain Chromium-only.
 - GPU resource/cleanup tests and earlier software-device readback/device-loss checks passed, but visible GPU presentation is not validated here. This limitation is accepted, not counted as a display-test pass.
-- Release archives target Linux ARM64/AMD64. Extracted ARM64 runtime is tested locally; AMD64 runtime and physical iOS remain untested locally. Desktop WebKit does not establish iOS keyboard/touch parity.
+- Release archives target Linux ARM64/AMD64. The Rust port passed native ARM64 extracted-package smoke; QEMU startup does not establish native AMD64 sandbox coverage. Desktop WebKit does not establish physical iPad Safari keyboard/touch behaviour.
 
 ## Maintenance contracts
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1-rust.1 — candidate, not published
+
+- Moved the standalone Rust service to the root Cargo package and made the Oak Oil static musl build the default on `rust`.
+- Removed Go sources and build dependencies from this branch. Rust tests replay 225 recorded capture cases against production code.
+- Fixed loading the Rust web client at a reverse proxy's trailing-slash URL prefix.
+- Package ARM64 and AMD64 candidates under separate Rust archive and checksum names. The published Go release is unchanged.
+
 ## 0.1.1 — 2026-11-23
 
 - Added `-base-path` for serving the browser client under a reverse proxy URL prefix.

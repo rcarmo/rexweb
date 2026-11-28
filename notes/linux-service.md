@@ -1,4 +1,4 @@
-# Linux service work item
+# Linux service scope and verification
 
 ## Scope
 
@@ -15,7 +15,17 @@ Native network access requires explicit anonymous opt-in. Remote web access requ
 - Local/remote native and browser clients share layouts and PTYs.
 - Linux sandbox denies outside host files, sockets and network; host mode is explicit.
 - Shutdown closes WebSockets and shells; systemd controls the whole process group.
-- Unit, race, Linux integration and extracted-native-package tests pass.
+- Rust tests, recorded capture regressions, frontend tests, Linux integration and extracted-native-package tests pass.
+
+## Rust migration record
+
+The Rust candidate replaces the service and build tooling on this branch only. The browser keeps the Bun/TypeScript frontend and pinned Ghostty WASM. The service runs that WASM in Wasmi and embeds the browser bundle in the static musl executable. The published Go implementation remains at [v0.1.1](https://github.com/rcarmo/rexweb/tree/v0.1.1).
+
+The [225 synthetic capture cases](../tests/fixtures/capture-chunks.jsonl) were recorded against the Go `internal/capturechunk` unit in [9932286](https://github.com/rcarmo/rexweb/commit/9932286f9f51488de76aad790c9147f6c20d6305). The Rust test runs those fixed inputs and expected results through the production pagination logic. The [recording metadata](../tests/fixtures/capture-chunks-origin.json) preserves the original fingerprint and checksum. No Go code or runtime bridge participates in the check.
+
+The root-layout candidate `0.1.1-rust.1` passed native ARM64 extracted-package, official Rex CLI, Linux sandbox and Chromium workspace, upload, prefix and input checks. Firefox and desktop WebKit passed renderer and BiDi checks, with Canvas fallback. Both musl binaries passed static ELF checks. AMD64 ran version, embedded web and host-mode startup under QEMU; full native AMD64 sandbox testing remains outstanding. Retest each candidate using [RELEASING.md](../RELEASING.md).
+
+The native API implements a revision-12 subset. Process metadata is limited, bootstrap does not return data tickets, and block resolution does not honour window scope. Desktop WebKit and simulated mobile viewport tests do not validate physical iPad Safari; visible WebGPU presentation remains unverified.
 
 ## Reference
 

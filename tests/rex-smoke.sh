@@ -1,3 +1,3 @@
 #!/bin/sh
 set -eu
-exec bun tests/rex-smoke.ts "${1:-bin/rexweb}"
+exec bun "$(dirname "$0")/rex-smoke.ts" "$@"
